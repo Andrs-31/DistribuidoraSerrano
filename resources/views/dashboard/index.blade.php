@@ -88,9 +88,9 @@
         <div class="card">
             <div class="card-header d-flex align-items-center justify-content-between">
                 <h5 class="mb-0">Facturas Recientes</h5>
-                {{-- <a href="{{ route('facturacion.index') }}" class="btn btn-sm btn-outline-primary">
+                <a href="{{ route('facturacion.index') }}" class="btn btn-sm btn-outline-primary">
                     Ver Todas
-                </a> --}}
+                </a>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
