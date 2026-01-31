@@ -24,6 +24,17 @@ Route::get('/productos/create', function () { return view('productos.create'); }
 Route::get('/productos/{producto}/edit', function ($producto) { return view('productos.edit', compact('producto')); })->name('productos.edit');
 Route::get('/productos/{producto}', function ($producto) { return view('productos.show', compact('producto')); })->name('productos.show');
 
+// Usuarios (gestión)
+Route::get('/usuarios', function () { return view('usuarios.index'); })->name('usuarios.index');
+Route::get('/usuarios/create', function () { return view('usuarios.create'); })->name('usuarios.create');
+Route::post('/usuarios', function (Request $r) { return redirect()->route('usuarios.index')->with('success', 'Usuario guardado (simulado).'); })->name('usuarios.store');
+Route::get('/usuarios/{usuario}', function ($usuario) { return view('usuarios.show', compact('usuario')); })->name('usuarios.show');
+Route::get('/usuarios/{usuario}/edit', function ($usuario) { return view('usuarios.edit', compact('usuario')); })->name('usuarios.edit');
+Route::match(['put','patch'], '/usuarios/{usuario}', function ($usuario) { return redirect()->route('usuarios.show', $usuario)->with('success', 'Usuario actualizado (simulado).'); })->name('usuarios.update');
+Route::delete('/usuarios/{usuario}', function ($usuario) { return redirect()->route('usuarios.index')->with('success', 'Usuario eliminado (simulado).'); })->name('usuarios.destroy');
+Route::post('/usuarios/{usuario}/reset-password', function ($usuario) { return redirect()->route('usuarios.show', $usuario)->with('success', 'Contraseña reseteada (simulado).'); })->name('usuarios.reset-password');
+Route::post('/usuarios/{usuario}/toggle-status', function ($usuario) { return redirect()->route('usuarios.show', $usuario)->with('success', 'Estado cambiado (simulado).'); })->name('usuarios.toggle-status');
+
 // Facturación
 Route::get('/facturacion', function () { return view('facturacion.index'); })->name('facturacion.index');
 Route::get('/facturacion/create', function () { return view('facturacion.create'); })->name('facturacion.create');
@@ -44,7 +55,7 @@ Route::post('/logout', function (Request $request) {
 // Rutas de autenticación mínimas (vistas existentes)
 Route::get('/login', function () { return view('auth.login'); })->name('login');
 Route::post('/login', function (Request $request) { return back()->with('error', 'Inicio de sesión no implementado.'); })->name('login.post');
-Route::get('/register', function () { return redirect()->route('login'); })->name('register');
+// Route::get('/register', function () { return redirect()->route('login'); })->name('register');
 Route::get('/password/reset', function () { return view('auth.forgot-password'); })->name('password.request');
 
 // Endpoints de formulario (stubs) para que los formularios no fallen

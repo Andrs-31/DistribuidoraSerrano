@@ -36,6 +36,11 @@
             <span>Productos</span>
         </a>
 
+        <a href="{{ route('usuarios.index') }}" class="nav-link {{ request()->routeIs('usuarios.*') ? 'active' : '' }}">
+            <i class="bi bi-person-circle"></i>
+            <span>Usuarios</span>
+        </a>
+
         <div class="nav-section mt-3">Reportes</div>
 
         <a href="{{ route('reportes.ventas') }}" class="nav-link {{ request()->routeIs('reportes.ventas') ? 'active' : '' }}">
