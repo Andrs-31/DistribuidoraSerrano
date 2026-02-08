@@ -27,9 +27,19 @@
 @push('scripts')
 <script>
 (function() {
-    const productos = @json($productos);
+    let productos = @json($productos);
     const inputBuscar = document.getElementById('buscarProducto');
     const resultados = document.getElementById('resultadosBusqueda');
+
+    // Función pública para actualizar los productos
+    window.actualizarBuscadorProductos = function(nuevosProductos) {
+        productos = nuevosProductos;
+        inputBuscar.value = '';
+        resultados.style.display = 'none';
+        console.log('Buscador actualizado con', productos.length, 'productos');
+    };
+
+    if (!inputBuscar) return;
 
     inputBuscar.addEventListener('input', function() {
         const query = this.value.toLowerCase().trim();
@@ -41,27 +51,28 @@
 
         const filtrados = productos.filter(p =>
             p.nombre.toLowerCase().includes(query) ||
-            p.codigo.toLowerCase().includes(query)
+            (p.codigo && p.codigo.toLowerCase().includes(query))
         ).slice(0, 10);
 
         if (filtrados.length > 0) {
             resultados.innerHTML = filtrados.map(p => `
                 <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
                         data-id="${p.id}" data-codigo="${p.codigo}" data-nombre="${p.nombre}"
-                        data-precio="${p.precio_base}" data-unidad="${p.unidad}">
+                        data-unidades='${JSON.stringify(p.unidades)}' 
+                        data-precio-default="${p.precio_default}">
                     <div>
                         <div class="fw-medium">${p.nombre}</div>
-                        <small class="text-secondary">${p.codigo} | ${p.unidad}</small>
+                        <small class="text-secondary">${p.codigo} | ${p.unidades.map(u => u.unidad).join(', ')}</small>
                     </div>
-                    <span class="badge bg-light text-dark">B/. ${parseFloat(p.precio_base).toFixed(2)}</span>
+                    <span class="badge bg-light text-dark">B/. ${parseFloat(p.precio_default).toFixed(2)}</span>
                 </button>
             `).join('');
             resultados.style.display = 'block';
 
-            // Add click handlers
             resultados.querySelectorAll('button').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    agregarProductoDesdeBoton(this);
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    agregarProducto(this);
                 });
             });
         } else {
@@ -70,57 +81,61 @@
         }
     });
 
-    // Close on click outside
     document.addEventListener('click', function(e) {
         if (!e.target.closest('.buscador-producto')) {
             resultados.style.display = 'none';
         }
     });
 
-    // Close on escape
     inputBuscar.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
             resultados.style.display = 'none';
         }
     });
 
-    function agregarProductoDesdeBoton(btn) {
-        const producto = {
-            id: btn.dataset.id,
-            codigo: btn.dataset.codigo,
-            nombre: btn.dataset.nombre,
-            precio: btn.dataset.precio,
-            unidad: btn.dataset.unidad
-        };
+    function agregarProducto(btn) {
+        const unidades = JSON.parse(btn.dataset.unidades || '[]');
+        const precioDefault = parseFloat(btn.dataset.precioDefault);
 
-        // Find or create empty row
         let emptyRow = document.querySelector('.detalle-row .producto-select[value=""]')?.closest('.detalle-row');
 
         if (!emptyRow) {
-            // Click add button to create new row
             document.getElementById('btnAgregarProducto').click();
             emptyRow = document.querySelector('.detalle-row:last-child');
         }
 
         if (emptyRow) {
             const select = emptyRow.querySelector('.producto-select');
-            select.value = producto.id;
-            emptyRow.querySelector('.unidad-input').value = producto.unidad;
-            emptyRow.querySelector('.precio-input').value = parseFloat(producto.precio).toFixed(2);
-            emptyRow.querySelector('input[name*="[descripcion]"]').value = producto.codigo + ' - ' + producto.nombre;
+            
+            // Buscar opción con este ID
+            Array.from(select.options).forEach(opt => {
+                if (opt.value == btn.dataset.id) {
+                    select.value = btn.dataset.id;
+                    opt.dataset.unidades = btn.dataset.unidades;
+                    opt.dataset.precioDefault = btn.dataset.precioDefault;
+                }
+            });
 
-            // Calculate subtotal
-            const cantidad = parseFloat(emptyRow.querySelector('.cantidad-input').value) || 1;
-            const precio = parseFloat(producto.precio) || 0;
-            emptyRow.querySelector('.subtotal-input').value = (cantidad * precio).toFixed(2);
-
-            // Trigger total recalculation
-            if (typeof calculateTotals === 'function') {
-                calculateTotals();
+            // Llenar select de unidades
+            const unidadSelect = emptyRow.querySelector('.unidad-input');
+            unidadSelect.innerHTML = '';
+            unidades.forEach(u => {
+                const opt = document.createElement('option');
+                opt.value = u.unidad;
+                opt.textContent = u.unidad + ' - B/. ' + parseFloat(u.precio).toFixed(2);
+                opt.dataset.precio = u.precio;
+                unidadSelect.appendChild(opt);
+            });
+            
+            if (unidades.length > 0) {
+                unidadSelect.value = unidades[0].unidad;
             }
+
+            // Disparar change para que se actualice todo
+            select.dispatchEvent(new Event('change'));
+            emptyRow.querySelector('input[name*="[descripcion]"]').value = btn.dataset.codigo + ' - ' + btn.dataset.nombre;
         }
 
-        // Clear search
         inputBuscar.value = '';
         resultados.style.display = 'none';
     }

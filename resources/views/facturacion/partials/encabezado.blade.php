@@ -1,23 +1,27 @@
 <div class="row g-3">
     <div class="col-md-6">
-        <label for="cliente_id" class="form-label">Cliente <span class="text-danger">*</span></label>
-        <select class="form-select @error('cliente_id') is-invalid @enderror" id="cliente_id" name="cliente_id" required>
+    <label for="cliente_id" class="form-label">Cliente <span class="text-danger">*</span></label>
+    <select class="form-select @error('cliente_id') is-invalid @enderror" 
+            id="cliente_id" 
+            name="cliente_id" 
+            required>
             <option value="">Seleccionar cliente...</option>
             @foreach($clientes ?? [] as $cliente)
-                <option value="{{ $cliente->id }}"
+                <option value="{{ $cliente->ruc }}"
                         data-ruc="{{ $cliente->ruc }}"
                         data-direccion="{{ $cliente->direccion }}"
                         data-telefono="{{ $cliente->telefono }}"
-                        data-grupo="{{ $cliente->grupo_id }}"
-                        {{ old('cliente_id', $factura->cliente_id ?? request('cliente')) == $cliente->id ? 'selected' : '' }}>
+                        data-grupo="{{ $cliente->id_grupo_fk }}"
+                        {{ old('cliente_id', $factura->cliente_id ?? request('cliente')) == $cliente->ruc ? 'selected' : '' }}>
                     {{ $cliente->nombre }} - {{ $cliente->ruc }}
                 </option>
-            @endforeach
-        </select>
-        @error('cliente_id')
-            <div class="invalid-feedback">{{ $message }}</div>
-        @enderror
+        @endforeach
+    </select>
+    
+    <div id="cliente-lock-msg" class="form-text text-warning d-none">
+        <i class="bi bi-lock-fill"></i> No puedes cambiar el cliente con productos en la lista.
     </div>
+</div>
 
     <div class="col-md-3">
         <label for="fecha" class="form-label">Fecha <span class="text-danger">*</span></label>
@@ -38,7 +42,7 @@
                class="form-control"
                id="numero"
                name="numero"
-               value="{{ old('numero', $factura->numero ?? $proximoNumero ?? 'FAC-' . now()->format('Y') . '-0001') }}"
+               value="{{ old('numero', $proximoNumero ?? '000001') }}"
                readonly>
         <div class="form-text">Generado automáticamente</div>
     </div>
@@ -78,10 +82,33 @@ document.getElementById('cliente_id').addEventListener('change', function() {
 
         // Store grupo for price lookup
         window.clienteGrupoId = selected.dataset.grupo;
+
+        // Fetch products/prices for this client and notify detail table
+        if (typeof fetch === 'function') {
+            fetch('/facturacion/clientes/' + this.value + '/productos')
+                .then(resp => resp.json())
+                .then(data => {
+                    window.productosDelCliente = data;
+                    if (window.actualizarProductosDelCliente) {
+                        window.actualizarProductosDelCliente(data);
+                    }
+                })
+                .catch(err => console.error('No se pudo cargar productos del cliente:', err));
+        }
     } else {
         infoDiv.style.display = 'none';
     }
 });
+
+// Este código vigila la tabla y bloquea al cliente automáticamente si detecta cambios
+const observer = new MutationObserver(function(mutations) {
+    updateEmptyMessage(); // Se ejecuta cada vez que se agrega o quita una fila
+});
+
+const detalleBody = document.getElementById('detalleBody');
+if (detalleBody) {
+    observer.observe(detalleBody, { childList: true });
+}
 
 // Trigger on page load if client is selected
 if (document.getElementById('cliente_id').value) {

@@ -11,7 +11,7 @@ class PermisoSeeder extends Seeder
 {
     public function run()
     {
-        Permiso::insert([
+        Permiso::insertOrIgnore([
             [
                 'id_permiso' => 1,
                 'nombre' => 'admin',

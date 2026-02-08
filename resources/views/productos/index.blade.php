@@ -77,17 +77,17 @@
                 <tbody>
                     @forelse($productos ?? [] as $producto)
                         <tr>
-                            <td class="fw-medium">{{ $producto->codigo }}</td>
+                            <td class="fw-medium">{{ $producto->codigo ?? 'PRD-'.str_pad($producto->id_producto ?? 1, 3, '0', STR_PAD_LEFT) }}</td>
                             <td>
                                 <div class="fw-medium">{{ $producto->nombre }}</div>
-                                <div class="text-secondary" style="font-size: 0.75rem;">{{ Str::limit($producto->descripcion, 40) }}</div>
+                                <div class="text-secondary" style="font-size: 0.75rem;">{{ Str::limit($producto->descripcion ?? '', 40) }}</div>
                             </td>
                             <td><span class="badge bg-light text-dark">{{ $producto->categoria ?? 'General' }}</span></td>
-                            <td>{{ $producto->unidad }}</td>
-                            <td class="fw-medium">B/. {{ number_format($producto->precio_base, 2) }}</td>
+                            <td>{{ $producto->unidad ?? '-' }}</td>
+                            <td class="fw-medium">B/. {{ number_format($producto->precio_base ?? 0, 2) }}</td>
                             <td>
-                                <span class="badge badge-{{ $producto->activo ? 'success' : 'danger' }}">
-                                    {{ $producto->activo ? 'Activo' : 'Inactivo' }}
+                                <span class="badge badge-{{ ($producto->estado ?? $producto->activo ?? false) ? 'success' : 'danger' }}">
+                                    {{ ($producto->estado ?? $producto->activo ?? false) ? 'Activo' : 'Inactivo' }}
                                 </span>
                             </td>
                             <td class="text-end">
@@ -99,13 +99,13 @@
                                         <i class="bi bi-pencil"></i>
                                     </a>
                                     <button type="button" class="btn btn-sm btn-light text-danger" title="Eliminar"
-                                            data-bs-toggle="modal" data-bs-target="#deleteModal{{ $producto->id }}">
+                                            data-bs-toggle="modal" data-bs-target="#deleteModal{{ $producto->id ?? $producto->id_producto }}">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </div>
 
                                 <!-- Delete Modal -->
-                                <div class="modal fade" id="deleteModal{{ $producto->id }}" tabindex="-1">
+                                <div class="modal fade" id="deleteModal{{ $producto->id ?? $producto->id_producto }}" tabindex="-1">
                                     <div class="modal-dialog modal-dialog-centered">
                                         <div class="modal-content">
                                             <div class="modal-header border-bottom">

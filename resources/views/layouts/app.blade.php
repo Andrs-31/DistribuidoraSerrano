@@ -316,6 +316,30 @@
                 margin-left: 0;
             }
         }
+
+            .sidebar, .main-wrapper {
+            transition: all 0.3s ease-in-out;
+        }
+
+        .sidebar.collapsed {
+            left: calc(var(--ds-sidebar-width) * -1);
+        }
+
+        .main-wrapper.expanded {
+            margin-left: 0;
+        }
+
+        /* Estilo para el botón hamburguesa */
+        #toggleSidebar {
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 0.375rem;
+            transition: background 0.2s;
+        }
+        
+        #toggleSidebar:hover {
+            background: var(--ds-background);
+        }
     </style>
 
     @stack('styles')
@@ -342,6 +366,21 @@
             csrfToken: '{{ csrf_token() }}'
         };
     </script>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const toggleBtn = document.getElementById('toggleSidebar');
+        const sidebar = document.querySelector('.sidebar');
+        const wrapper = document.querySelector('.main-wrapper');
+
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', function() {
+                sidebar.classList.toggle('collapsed');
+                wrapper.classList.toggle('expanded');
+            });
+        }
+    });
+</script>
     @stack('scripts')
 </body>
 </html>

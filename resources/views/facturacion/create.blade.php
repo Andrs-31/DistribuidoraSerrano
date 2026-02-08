@@ -20,3 +20,28 @@
     </div>
 </form>
 @endsection
+
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // 1. Colapsar el sidebar y expandir el área de trabajo para la tabla
+        const sidebar = document.querySelector('.sidebar');
+        const wrapper = document.querySelector('.main-wrapper');
+        
+        if (sidebar && wrapper) {
+            sidebar.classList.add('collapsed');
+            wrapper.classList.add('expanded');
+        }
+
+        // 2. Ocultar el buscador (Search) de la navbar
+        // Usamos el selector que apunta al contenedor del input y la lupa
+        const searchContainer = document.querySelector('.main-navbar .position-relative.d-none.d-md-block');
+        if (searchContainer) {
+            searchContainer.style.setProperty('display', 'none', 'important');
+        }
+
+        // NOTA: No tocamos el contenedor de Date/Time (.d-none.d-lg-block.text-end)
+        // para que permanezca visible como solicitaste.
+    });
+</script>
+@endpush

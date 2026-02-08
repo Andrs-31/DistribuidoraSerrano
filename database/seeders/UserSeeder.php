@@ -16,7 +16,7 @@ class UserSeeder extends Seeder
 
     public function run()
     {
-        User::insert([
+        User::insertOrIgnore([
             [
                 'nombre' => 'Administrador',
                 'user' => 'admin',

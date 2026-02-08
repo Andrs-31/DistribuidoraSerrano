@@ -5,6 +5,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\FacturacionController;
+use App\Http\Controllers\ListaPrecioController;
+use App\Models\Producto;
+use App\Models\Cliente;
 
 # Rutas básicas para la navegación del proyecto
 Route::get('/', function () {
@@ -57,15 +61,20 @@ Route::middleware('auth')->group(function () {
 
     // Facturación (requieren permiso 'facturacion')
     Route::middleware('permiso:facturacion')->group(function () {
-        Route::get('/facturacion', function () { return view('facturacion.index'); })->name('facturacion.index');
-        Route::get('/facturacion/create', function () { return view('facturacion.create'); })->name('facturacion.create');
-        Route::get('/facturacion/{factura}', function ($factura) { return view('facturacion.show', compact('factura')); })->name('facturacion.show');
+        Route::get('/facturacion', [FacturacionController::class, 'index'])->name('facturacion.index');
+        Route::get('/facturacion/create', [FacturacionController::class, 'create'])->name('facturacion.create');
+        Route::post('/facturacion', [FacturacionController::class, 'store'])->name('facturacion.store');
+        Route::get('/facturacion/{factura}', [FacturacionController::class, 'show'])->name('facturacion.show');
+        Route::get('/facturacion/{factura}/edit', [FacturacionController::class, 'edit'])->name('facturacion.edit');
+        Route::match(['put','patch'], '/facturacion/{factura}', [FacturacionController::class, 'update'])->name('facturacion.update');
+        Route::delete('/facturacion/{factura}', [FacturacionController::class, 'destroy'])->name('facturacion.destroy');
         Route::get('/facturacion/{factura}/print', function ($factura) { return view('facturacion.print', compact('factura')); })->name('facturacion.print');
-
-        // Facturación - endpoints
-        Route::post('/facturacion', function (Request $r) { return redirect()->route('facturacion.index')->with('success', 'Factura guardada (simulado).'); })->name('facturacion.store');
-        Route::match(['put','patch'], '/facturacion/{factura}', function ($factura) { return redirect()->route('facturacion.show', $factura)->with('success', 'Factura actualizada (simulado).'); })->name('facturacion.update');
-        Route::delete('/facturacion/{factura}', function ($factura) { return redirect()->route('facturacion.index')->with('success', 'Factura eliminada (simulado).'); })->name('facturacion.destroy');
+        
+        // Endpoint para generar PDF
+        Route::post('/facturacion/pdf/generar', [FacturacionController::class, 'generarPdf'])->name('facturacion.generar-pdf');
+        
+        // Endpoint auxiliar: productos por cliente 
+        Route::get('/facturacion/clientes/{clienteId}/productos', [ListaPrecioController::class, 'porCliente'])->name('facturacion.productos-por-cliente');
     });
 
     // Reportes (requieren permiso 'reportes')
