@@ -20,7 +20,12 @@ class AuthController extends Controller
         $credentials = $request->validate([
             'email' => ['required','email'],
             'password' => ['required'],
+            // IMPLEMENTACION DE CAPTCHA
+            'g-recaptcha-response' => ['required', 'captcha'],
         ]);
+
+         // EXTRAER SOLO email y password PARA EVALUACION SIN EL CAPTACH A LA BD
+        $credentials = $request->only('email', 'password');
 
         $remember = $request->boolean('remember');
 

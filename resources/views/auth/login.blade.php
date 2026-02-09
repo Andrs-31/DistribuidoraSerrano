@@ -80,6 +80,18 @@
                 </a>
             </div>
 
+            {{-- CAPTCHA --}}
+            <div class="mb-4 text-center">
+                {!! NoCaptcha::display() !!}
+
+                @error('g-recaptcha-response')
+                    <div class="text-danger mt-2" style="font-size: 0.8125rem;">
+                        {{ $message }}
+                    </div>
+                @enderror
+            </div>
+
+
             <button type="submit" class="btn btn-primary w-100">
                 <i class="bi bi-box-arrow-in-right me-2"></i>
                 Iniciar Sesión
@@ -94,6 +106,9 @@
 @endsection
 
 @push('scripts')
+{{-- IMPLEMENTACION DE CAPTCHA --}}
+{!! NoCaptcha::renderJs() !!}
+{{-- ----------------------- --}}
 <script>
     document.getElementById('togglePassword').addEventListener('click', function() {
         const passwordInput = document.getElementById('password');
