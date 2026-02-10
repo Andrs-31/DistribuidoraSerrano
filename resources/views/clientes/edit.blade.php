@@ -18,7 +18,7 @@
                 <p class="mb-0 text-secondary" style="font-size: 0.8125rem;">Modifique la información del cliente: {{ $cliente->nombre ?? 'Cliente' }}</p>
             </div>
 
-            <form action="{{ route('clientes.update', $cliente ?? 1) }}" method="POST">
+            <form action="{{ route('clientes.update', $cliente->ruc) }}" method="POST">
                 @csrf
                 @method('PUT')
 
@@ -27,9 +27,7 @@
                 </div>
 
                 <div class="card-footer d-flex justify-content-between">
-                    <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
-                        <i class="bi bi-trash me-1"></i>Desactivar
-                    </button>
+
                     <div class="d-flex gap-2">
                         <a href="{{ route('clientes.index') }}" class="btn btn-secondary">
                             <i class="bi bi-x-lg me-1"></i>Cancelar
@@ -44,26 +42,94 @@
     </div>
 </div>
 
-<!-- Delete Modal -->
-<div class="modal fade" id="deleteModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header border-bottom">
-                <h5 class="modal-title">Confirmar desactivación</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p class="mb-0">¿Está seguro de que desea desactivar al cliente <strong>{{ $cliente->nombre ?? 'Cliente' }}</strong>? Esta acción no eliminará los registros históricos.</p>
-            </div>
-            <div class="modal-footer border-top">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <form action="{{ route('clientes.destroy', $cliente ?? 1) }}" method="POST" class="d-inline">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit" class="btn btn-danger">Desactivar</button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const rucInput = document.getElementById('ruc');
+    if (rucInput) rucInput.setAttribute('readonly', 'readonly');
+
+    const provinciaSelect = document.getElementById('provincia');
+    const distritoSelect = document.getElementById('distrito');
+    const direccionTextarea = document.getElementById('direccion');
+
+    const provinciaId = @json($provinciaId ?? '');
+    const distritoId = @json($distritoId ?? '');
+    const distritos = @json($distritos ?? []);
+
+    // Seleccionar provincia guardada
+    if (provinciaSelect && provinciaId) {
+        provinciaSelect.value = provinciaId;
+    }
+
+    // Poblar distritos guardados (los que envió el controlador) y seleccionar el guardado
+    if (distritoSelect) {
+        if (Array.isArray(distritos) && distritos.length) {
+            distritoSelect.innerHTML = '<option value="">Seleccionar distrito...</option>';
+            distritos.forEach(function (d) {
+                const opt = document.createElement('option');
+                opt.value = d.codigo_distrito ?? d.id ?? '';
+                opt.textContent = d.nombre_distrito ?? d.nombre ?? '';
+                if ((d.codigo_distrito ?? d.id ?? '') == (distritoId ?? '')) opt.selected = true;
+                distritoSelect.appendChild(opt);
+            });
+            distritoSelect.disabled = false;
+        } else {
+            distritoSelect.innerHTML = '<option value="">Seleccionar provincia primero...</option>';
+            distritoSelect.disabled = !provinciaId;
+        }
+    }
+
+    // Colocar la dirección simple en el textarea (solo la parte de la dirección)
+    const direccionSimple = @json($direccionSimple ?? '');
+    if (direccionTextarea && direccionSimple) {
+        direccionTextarea.value = direccionSimple;
+    }
+
+    // Si el usuario cambia provincia, cargar distritos y obligar a seleccionar nuevo distrito
+    if (provinciaSelect) {
+        provinciaSelect.addEventListener('change', function () {
+            const codigoProvincia = this.value;
+
+            if (!codigoProvincia) {
+                if (distritoSelect) {
+                    distritoSelect.innerHTML = '<option value="">Seleccionar provincia primero...</option>';
+                    distritoSelect.disabled = true;
+                }
+                return;
+            }
+
+            // limpiar y habilitar para nueva selección
+            if (distritoSelect) {
+                distritoSelect.innerHTML = '<option value="">Cargando distritos...</option>';
+                distritoSelect.disabled = true;
+            }
+
+            fetch('/distritos/' + codigoProvincia)
+                .then(function (res) {
+                    if (!res.ok) throw new Error('Error al cargar distritos');
+                    return res.json();
+                })
+                .then(function (data) {
+                    if (!distritoSelect) return;
+                    distritoSelect.innerHTML = '<option value="">Seleccionar distrito...</option>';
+                    data.forEach(function (d) {
+                        const opt = document.createElement('option');
+                        opt.value = d.codigo_distrito ?? d.id ?? '';
+                        opt.textContent = d.nombre_distrito ?? d.nombre ?? '';
+                        distritoSelect.appendChild(opt);
+                    });
+                    distritoSelect.disabled = false;
+                })
+                .catch(function (error) {
+                    console.error('Error al cargar distritos:', error);
+                    if (!distritoSelect) return;
+                    distritoSelect.innerHTML = '<option value="">Error al cargar distritos</option>';
+                    distritoSelect.disabled = true;
+                });
+        });
+    }
+});
+</script>
+@endpush
+
 @endsection

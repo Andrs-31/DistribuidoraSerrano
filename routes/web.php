@@ -10,6 +10,9 @@ use App\Http\Controllers\ListaPrecioController;
 use App\Models\Producto;
 use App\Models\Cliente;
 
+use App\Http\Controllers\ClienteController;
+use App\Http\Controllers\UbicacionController;
+
 # Rutas básicas para la navegación del proyecto
 Route::get('/', function () {
     return Auth::check() ? redirect()->route('dashboard.index') : redirect()->route('login');
@@ -22,16 +25,12 @@ Route::middleware('auth')->group(function () {
 
     // Clientes (requieren permiso 'gestion_clientes')
     Route::middleware('permiso:gestion_clientes')->group(function () {
-        Route::get('/clientes', function () { return view('clientes.index'); })->name('clientes.index');
-        Route::get('/clientes/create', function () { return view('clientes.create'); })->name('clientes.create');
-        Route::get('/clientes/{cliente}/edit', function ($cliente) { return view('clientes.edit', compact('cliente')); })->name('clientes.edit');
-        Route::get('/clientes/{cliente}', function ($cliente) { return view('clientes.show', compact('cliente')); })->name('clientes.show');
+        Route::resource('clientes', ClienteController::class);
 
-        // Clientes - endpoints
-        Route::post('/clientes', function (Request $r) { return redirect()->route('clientes.index')->with('success', 'Cliente guardado (simulado).'); })->name('clientes.store');
-        Route::match(['put','patch'], '/clientes/{cliente}', function ($cliente) { return redirect()->route('clientes.show', $cliente)->with('success', 'Cliente actualizado (simulado).'); })->name('clientes.update');
-        Route::delete('/clientes/{cliente}', function ($cliente) { return redirect()->route('clientes.index')->with('success', 'Cliente eliminado (simulado).'); })->name('clientes.destroy');
+        // Distritos dinámicos (AJAX)
+        Route::get('/distritos/{provincia}', [UbicacionController::class, 'distritos']);
     });
+
 
     // Productos (requieren permiso 'gestion_productos')
     Route::middleware('permiso:gestion_productos')->group(function () {
@@ -69,11 +68,11 @@ Route::middleware('auth')->group(function () {
         Route::match(['put','patch'], '/facturacion/{factura}', [FacturacionController::class, 'update'])->name('facturacion.update');
         Route::delete('/facturacion/{factura}', [FacturacionController::class, 'destroy'])->name('facturacion.destroy');
         Route::get('/facturacion/{factura}/print', function ($factura) { return view('facturacion.print', compact('factura')); })->name('facturacion.print');
-        
+
         // Endpoint para generar PDF
         Route::post('/facturacion/pdf/generar', [FacturacionController::class, 'generarPdf'])->name('facturacion.generar-pdf');
-        
-        // Endpoint auxiliar: productos por cliente 
+
+        // Endpoint auxiliar: productos por cliente
         Route::get('/facturacion/clientes/{clienteId}/productos', [ListaPrecioController::class, 'porCliente'])->name('facturacion.productos-por-cliente');
         // Esta obtiene los datos (usada por el ojito)
         Route::get('/facturacion/{factura}/datos-pdf', [FacturacionController::class, 'obtenerDatosPdf']);

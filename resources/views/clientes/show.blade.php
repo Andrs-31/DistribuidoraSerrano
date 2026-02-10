@@ -20,14 +20,14 @@
                 </div>
                 <h4 class="mb-1">{{ $cliente->nombre ?? 'Comercial El Triunfo, S.A.' }}</h4>
                 <p class="text-secondary mb-3">{{ $cliente->ruc ?? '155634567-2-2020' }}</p>
-                <span class="badge badge-{{ ($cliente->activo ?? true) ? 'success' : 'danger' }} mb-3">
-                    {{ ($cliente->activo ?? true) ? 'Activo' : 'Inactivo' }}
+                <span class="badge badge-{{ ($cliente->estado ?? 1) ? 'success' : 'danger' }} mb-3">
+                    {{ ($cliente->estado ?? 1) ? 'Activo' : 'Inactivo' }}
                 </span>
                 <div class="d-flex justify-content-center gap-2">
-                    <a href="{{ route('clientes.edit', $cliente ?? 1) }}" class="btn btn-primary btn-sm">
+                    <a href="{{ route('clientes.edit', $cliente->ruc) }}" class="btn btn-primary btn-sm">
                         <i class="bi bi-pencil me-1"></i>Editar
                     </a>
-                    <a href="{{ route('facturacion.create', ['cliente' => $cliente->id ?? 1]) }}" class="btn btn-success btn-sm">
+                    <a href="{{ route('facturacion.create', ['cliente' => $cliente->ruc]) }}" class="btn btn-success btn-sm">
                         <i class="bi bi-receipt me-1"></i>Nueva Factura
                     </a>
                 </div>
@@ -38,7 +38,7 @@
                         <div class="d-flex align-items-center gap-2 text-secondary mb-1" style="font-size: 0.75rem;">
                             <i class="bi bi-people"></i> Grupo
                         </div>
-                        <div class="fw-medium">{{ $cliente->grupo->nombre ?? 'Mayoristas' }}</div>
+                        <div class="fw-medium">{{ $cliente->grupoCliente->nombre ?? '—' }}</div>
                     </div>
                     <div class="col-12">
                         <div class="d-flex align-items-center gap-2 text-secondary mb-1" style="font-size: 0.75rem;">
@@ -56,13 +56,19 @@
                         <div class="d-flex align-items-center gap-2 text-secondary mb-1" style="font-size: 0.75rem;">
                             <i class="bi bi-geo-alt"></i> Dirección
                         </div>
-                        <div class="fw-medium">{{ $cliente->direccion ?? 'Calle 50, Local 12, Ciudad de Panamá' }}</div>
+                        <div class="fw-medium">{{ $cliente->direccion ?? 'Calle 50, Local 12, Ciudad' }}</div>
                     </div>
                     <div class="col-12">
                         <div class="d-flex align-items-center gap-2 text-secondary mb-1" style="font-size: 0.75rem;">
-                            <i class="bi bi-map"></i> Ubicación
+                            <i class="bi bi-calendar-check"></i> Fecha de registro
                         </div>
-                        <div class="fw-medium">{{ $cliente->distrito ?? 'Panamá' }}, {{ $cliente->provincia ?? 'Panamá' }}</div>
+                        <div class="fw-medium">{{ \Carbon\Carbon::parse($cliente->fecha_registro)?->format('d/m/Y H:i') ?? 'Sin registro' }}</div>
+                    </div>
+                    <div class="col-12">
+                        <div class="d-flex align-items-center gap-2 text-secondary mb-1" style="font-size: 0.75rem;">
+                            <i class="bi bi-pencil-square"></i> Fecha de edición
+                        </div>
+                        <div class="fw-medium">{{ \Carbon\Carbon::parse($cliente->fecha_edicion)?->format('d/m/Y H:i') ?? 'Sin edición' }}</div>
                     </div>
                 </div>
             </div>
@@ -77,19 +83,19 @@
                 <div class="row g-3">
                     <div class="col-6">
                         <div class="text-secondary" style="font-size: 0.75rem;">Total Facturas</div>
-                        <div class="fs-4 fw-bold">{{ $cliente->facturas_count ?? 24 }}</div>
+                        <div class="fs-4 fw-bold">{{ $facturas_count }}</div>
                     </div>
                     <div class="col-6">
                         <div class="text-secondary" style="font-size: 0.75rem;">Total Compras</div>
-                        <div class="fs-4 fw-bold">B/. {{ number_format($cliente->total_compras ?? 12450.00, 2) }}</div>
+                        <div class="fs-4 fw-bold">B/. {{ number_format($total_compras, 2) }}</div>
                     </div>
                     <div class="col-6">
                         <div class="text-secondary" style="font-size: 0.75rem;">Última Compra</div>
-                        <div class="fw-medium">{{ $cliente->ultima_factura->fecha->format('d/m/Y') ?? now()->format('d/m/Y') }}</div>
+                        <div class="fw-medium">{{ $ultima_factura?->fecha_factura?->format('d/m/Y') ?? 'Sin facturas' }}</div>
                     </div>
                     <div class="col-6">
                         <div class="text-secondary" style="font-size: 0.75rem;">Cliente Desde</div>
-                        <div class="fw-medium">{{ $cliente->created_at->format('M Y') ?? 'Ene 2023' }}</div>
+                        <div class="fw-medium">{{ \Carbon\Carbon::parse($cliente->fecha_registro)?->format('M Y') ?? 'Sin registro' }}</div>
                     </div>
                 </div>
             </div>
@@ -101,7 +107,7 @@
         <div class="card">
             <div class="card-header d-flex align-items-center justify-content-between">
                 <h5 class="mb-0">Historial de Facturas</h5>
-                <a href="{{ route('facturacion.index', ['cliente' => $cliente->id ?? 1]) }}" class="btn btn-sm btn-outline-primary">
+                <a href="{{ route('facturacion.index', ['cliente' => $cliente->ruc]) }}" class="btn btn-sm btn-outline-primary">
                     Ver Todas
                 </a>
             </div>
@@ -119,15 +125,15 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @forelse($cliente->facturas ?? [] as $factura)
+                            @forelse($facturas as $factura)
                                 <tr>
-                                    <td class="fw-medium">{{ $factura->numero }}</td>
-                                    <td>{{ $factura->fecha->format('d/m/Y') }}</td>
-                                    <td>{{ $factura->detalles_count }} items</td>
-                                    <td class="fw-medium">B/. {{ number_format($factura->total, 2) }}</td>
+                                    <td class="fw-medium">{{ $factura->num_factura }}</td>
+                                    <td>{{ $factura->fecha_factura?->format('d/m/Y') ?? '—' }}</td>
+                                    <td>{{ $factura->detalles_count ?? 0 }} items</td>
+                                    <td class="fw-medium">B/. {{ number_format($factura->total ?? 0, 2) }}</td>
                                     <td>
-                                        <span class="badge badge-{{ $factura->estado === 'pagada' ? 'success' : 'warning' }}">
-                                            {{ ucfirst($factura->estado) }}
+                                        <span class="badge badge-{{ ($factura->estado ?? '') === 'pagada' ? 'success' : 'warning' }}">
+                                            {{ ucfirst($factura->estado ?? '') }}
                                         </span>
                                     </td>
                                     <td>
@@ -137,38 +143,8 @@
                                     </td>
                                 </tr>
                             @empty
-                                <!-- Demo data -->
                                 <tr>
-                                    <td class="fw-medium">FAC-2024-0012</td>
-                                    <td>{{ now()->format('d/m/Y') }}</td>
-                                    <td>5 items</td>
-                                    <td class="fw-medium">B/. 245.50</td>
-                                    <td><span class="badge badge-success">Pagada</span></td>
-                                    <td><button class="btn btn-sm btn-light"><i class="bi bi-eye"></i></button></td>
-                                </tr>
-                                <tr>
-                                    <td class="fw-medium">FAC-2024-0008</td>
-                                    <td>{{ now()->subDays(5)->format('d/m/Y') }}</td>
-                                    <td>8 items</td>
-                                    <td class="fw-medium">B/. 567.25</td>
-                                    <td><span class="badge badge-success">Pagada</span></td>
-                                    <td><button class="btn btn-sm btn-light"><i class="bi bi-eye"></i></button></td>
-                                </tr>
-                                <tr>
-                                    <td class="fw-medium">FAC-2024-0003</td>
-                                    <td>{{ now()->subDays(12)->format('d/m/Y') }}</td>
-                                    <td>3 items</td>
-                                    <td class="fw-medium">B/. 189.00</td>
-                                    <td><span class="badge badge-success">Pagada</span></td>
-                                    <td><button class="btn btn-sm btn-light"><i class="bi bi-eye"></i></button></td>
-                                </tr>
-                                <tr>
-                                    <td class="fw-medium">FAC-2024-0001</td>
-                                    <td>{{ now()->subDays(20)->format('d/m/Y') }}</td>
-                                    <td>12 items</td>
-                                    <td class="fw-medium">B/. 1,234.00</td>
-                                    <td><span class="badge badge-success">Pagada</span></td>
-                                    <td><button class="btn btn-sm btn-light"><i class="bi bi-eye"></i></button></td>
+                                    <td colspan="6" class="text-center text-secondary">No hay facturas para este cliente.</td>
                                 </tr>
                             @endforelse
                         </tbody>

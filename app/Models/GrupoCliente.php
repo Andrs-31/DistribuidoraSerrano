@@ -10,6 +10,7 @@ class GrupoCliente extends Model
     protected $primaryKey = 'id_grupo';
     public $timestamps = false;
     protected $guarded = [];
+    protected $fillable = ['nombre', 'estado'];
 
     public function clientes()
     {

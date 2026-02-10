@@ -32,10 +32,10 @@
             <div class="col-md-3">
                 <select class="form-select" name="grupo">
                     <option value="">Todos los grupos</option>
-                    @foreach($grupos ?? [] as $grupo)
-                        <option value="{{ $grupo->id }}" {{ request('grupo') == $grupo->id ? 'selected' : '' }}>
-                            {{ $grupo->nombre }}
-                        </option>
+                        @foreach($grupos ?? [] as $grupo)
+                            <option value="{{ $grupo->id_grupo }}" {{ request('grupo') == $grupo->id_grupo ? 'selected' : '' }}>
+                                {{ $grupo->nombre }}
+                            </option>
                     @endforeach
                 </select>
             </div>
@@ -76,44 +76,53 @@
                                 <div class="text-secondary" style="font-size: 0.75rem;">{{ $cliente->email }}</div>
                             </td>
                             <td>{{ $cliente->ruc ?? 'N/A' }}</td>
-                            <td>{{ $cliente->grupo->nombre ?? 'Sin grupo' }}</td>
+                            <td>{{ $cliente->grupoCliente->nombre ?? 'Sin grupo' }}</td>
                             <td>{{ $cliente->telefono ?? 'N/A' }}</td>
                             <td>
-                                <span class="badge badge-{{ $cliente->activo ? 'success' : 'danger' }}">
-                                    {{ $cliente->activo ? 'Activo' : 'Inactivo' }}
+                                <span class="badge badge-{{ $cliente->estado == 1 ? 'success' : 'danger' }}">
+                                    {{ $cliente->estado == 1 ? 'Activo' : 'Inactivo' }}
                                 </span>
                             </td>
                             <td class="text-end">
                                 <div class="btn-group">
-                                    <a href="{{ route('clientes.show', $cliente) }}" class="btn btn-sm btn-light" title="Ver">
+                                    <a href="{{ route('clientes.show', $cliente->ruc) }}" class="btn btn-sm btn-light" title="Ver">
                                         <i class="bi bi-eye"></i>
                                     </a>
-                                    <a href="{{ route('clientes.edit', $cliente) }}" class="btn btn-sm btn-light" title="Editar">
+                                    <a href="{{ route('clientes.edit', $cliente->ruc) }}" class="btn btn-sm btn-light" title="Editar">
                                         <i class="bi bi-pencil"></i>
                                     </a>
-                                    <button type="button" class="btn btn-sm btn-light text-danger" title="Eliminar"
-                                            data-bs-toggle="modal" data-bs-target="#deleteModal{{ $cliente->id }}">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
+                                    @if($cliente->estado == 1)
+                                        <button type="button" class="btn btn-sm btn-light text-warning" title="Desactivar"
+                                                data-bs-toggle="modal" data-bs-target="#toggleModal{{ $cliente->ruc }}">
+                                            <i class="bi bi-person-dash"></i>
+                                        </button>
+                                    @else
+                                        <button type="button" class="btn btn-sm btn-light text-success" title="Activar"
+                                                data-bs-toggle="modal" data-bs-target="#toggleModal{{ $cliente->ruc }}">
+                                            <i class="bi bi-person-plus"></i>
+                                        </button>
+                                    @endif
                                 </div>
 
-                                <!-- Delete Modal -->
-                                <div class="modal fade" id="deleteModal{{ $cliente->id }}" tabindex="-1">
+                                <!-- Toggle Modal (activar/desactivar) -->
+                                <div class="modal fade" id="toggleModal{{ $cliente->ruc }}" tabindex="-1">
                                     <div class="modal-dialog modal-dialog-centered">
                                         <div class="modal-content">
                                             <div class="modal-header border-bottom">
-                                                <h5 class="modal-title">Confirmar eliminación</h5>
+                                                <h5 class="modal-title">{{ $cliente->estado == 1 ? 'Confirmar desactivación' : 'Confirmar activación' }}</h5>
                                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                             </div>
                                             <div class="modal-body text-start">
-                                                <p class="mb-0">¿Está seguro de que desea desactivar al cliente <strong>{{ $cliente->nombre }}</strong>?</p>
+                                                <p class="mb-0">{!! $cliente->estado == 1 ? "¿Está seguro de que desea desactivar al cliente <strong>{$cliente->nombre}</strong>?" : "¿Está seguro de que desea activar al cliente <strong>{$cliente->nombre}</strong>?" !!}</p>
                                             </div>
                                             <div class="modal-footer border-top">
                                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                                <form action="{{ route('clientes.destroy', $cliente) }}" method="POST" class="d-inline">
+                                                <form action="{{ route('clientes.destroy', $cliente->ruc) }}" method="POST" class="d-inline">
                                                     @csrf
                                                     @method('DELETE')
-                                                    <button type="submit" class="btn btn-danger">Desactivar</button>
+                                                    <button type="submit" class="btn {{ $cliente->estado == 1 ? 'btn-warning' : 'btn-success' }}">
+                                                        {{ $cliente->estado == 1 ? 'Desactivar' : 'Activar' }}
+                                                    </button>
                                                 </form>
                                             </div>
                                         </div>
@@ -122,74 +131,8 @@
                             </td>
                         </tr>
                     @empty
-                        <!-- Demo data -->
                         <tr>
-                            <td>
-                                <div class="fw-medium">Comercial El Triunfo, S.A.</div>
-                                <div class="text-secondary" style="font-size: 0.75rem;">eltriunfo@gmail.com</div>
-                            </td>
-                            <td>155634567-2-2020</td>
-                            <td><span class="badge bg-light text-dark">Mayoristas</span></td>
-                            <td>+507 6789-0123</td>
-                            <td><span class="badge badge-success">Activo</span></td>
-                            <td class="text-end">
-                                <div class="btn-group">
-                                    <button class="btn btn-sm btn-light"><i class="bi bi-eye"></i></button>
-                                    <button class="btn btn-sm btn-light"><i class="bi bi-pencil"></i></button>
-                                    <button class="btn btn-sm btn-light text-danger"><i class="bi bi-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>
-                                <div class="fw-medium">Mini Super Central</div>
-                                <div class="text-secondary" style="font-size: 0.75rem;">msuper@hotmail.com</div>
-                            </td>
-                            <td>8-456-789</td>
-                            <td><span class="badge bg-light text-dark">Minoristas</span></td>
-                            <td>+507 6123-4567</td>
-                            <td><span class="badge badge-success">Activo</span></td>
-                            <td class="text-end">
-                                <div class="btn-group">
-                                    <button class="btn btn-sm btn-light"><i class="bi bi-eye"></i></button>
-                                    <button class="btn btn-sm btn-light"><i class="bi bi-pencil"></i></button>
-                                    <button class="btn btn-sm btn-light text-danger"><i class="bi bi-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>
-                                <div class="fw-medium">Abarrotería Don José</div>
-                                <div class="text-secondary" style="font-size: 0.75rem;">djose@gmail.com</div>
-                            </td>
-                            <td>4-234-567</td>
-                            <td><span class="badge bg-light text-dark">Minoristas</span></td>
-                            <td>+507 6234-5678</td>
-                            <td><span class="badge badge-success">Activo</span></td>
-                            <td class="text-end">
-                                <div class="btn-group">
-                                    <button class="btn btn-sm btn-light"><i class="bi bi-eye"></i></button>
-                                    <button class="btn btn-sm btn-light"><i class="bi bi-pencil"></i></button>
-                                    <button class="btn btn-sm btn-light text-danger"><i class="bi bi-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>
-                                <div class="fw-medium">Super La Economía</div>
-                                <div class="text-secondary" style="font-size: 0.75rem;">economia@gmail.com</div>
-                            </td>
-                            <td>155789012-2-2019</td>
-                            <td><span class="badge bg-light text-dark">Mayoristas</span></td>
-                            <td>+507 6345-6789</td>
-                            <td><span class="badge badge-danger">Inactivo</span></td>
-                            <td class="text-end">
-                                <div class="btn-group">
-                                    <button class="btn btn-sm btn-light"><i class="bi bi-eye"></i></button>
-                                    <button class="btn btn-sm btn-light"><i class="bi bi-pencil"></i></button>
-                                    <button class="btn btn-sm btn-light text-danger"><i class="bi bi-trash"></i></button>
-                                </div>
-                            </td>
+                            <td colspan="6" class="text-center text-secondary">No hay clientes registrados.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -203,4 +146,20 @@
         </div>
     @endif
 </div>
+
+{{-- QUE SE HAGA EL SIDEBAR DINAMICO CUANDO INGRESO A ESA SECCION --}}
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const sidebar = document.querySelector('.sidebar');
+        const wrapper = document.querySelector('.main-wrapper');
+
+        if (sidebar && wrapper) {
+            sidebar.classList.add('collapsed');
+            wrapper.classList.add('expanded');
+        }
+    });
+</script>
+@endpush
+
 @endsection
