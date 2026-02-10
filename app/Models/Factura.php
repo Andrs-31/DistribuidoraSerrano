@@ -11,6 +11,7 @@ class Factura extends Model
     public $incrementing = true;
     public $timestamps = false;
     protected $guarded = [];
+    protected $casts = ['fecha_factura' => 'date'];
 
     public function cliente()
     {
@@ -24,6 +25,6 @@ class Factura extends Model
 
     public function detalles()
     {
-        return $this->hasMany(FacturaDetalle::class, 'num_factura_fk', 'id_factura');
+        return $this->hasMany(FacturaDetalle::class, 'num_factura_fk', 'num_factura');
     }
 }

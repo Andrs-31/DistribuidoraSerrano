@@ -13,9 +13,36 @@ use Illuminate\Support\Facades\DB;
 
 class FacturacionController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        return view('facturacion.index');
+        // 1. Carga eficiente con relación al cliente
+        $query = Factura::with('cliente');
+
+        // 2. Filtro por N° de Factura (Clave Primaria)
+        if ($request->filled('search')) {
+            $query->where('num_factura', 'like', '%' . $request->search . '%');
+        }
+
+        // 3. Filtro por Cliente (FK ruc_cliente_fk)
+        if ($request->filled('cliente')) {
+            $query->where('ruc_cliente_fk', $request->cliente);
+        }
+
+        // 4. Filtro por Rango de Fechas
+        if ($request->filled('fecha_desde')) {
+            $query->whereDate('fecha_factura', '>=', $request->fecha_desde);
+        }
+        if ($request->filled('fecha_hasta')) {
+            $query->whereDate('fecha_factura', '<=', $request->fecha_hasta);
+        }
+
+        // 5. Ejecutar consulta con paginación
+        $facturas = $query->orderBy('num_factura', 'desc')->paginate(10);
+
+        // 6. Obtener clientes para el selector de filtros
+        $clientes = Cliente::orderBy('nombre')->get();
+
+        return view('facturacion.index', compact('facturas', 'clientes'));
     }
 
     public function create()
@@ -161,5 +188,63 @@ class FacturacionController extends Controller
         $pdf = Pdf::loadHTML($html)->setPaper('a4');
 
         return $pdf->download("factura_{$numero}_{$fecha}.pdf");
+    }
+
+    public function obtenerDatosPdf(Request $request, $num_factura) // <-- Agregamos Request aquí
+    {
+        try {
+            // Buscamos la factura en la base de datos con sus relaciones corregidas
+            $factura = Factura::with(['cliente', 'detalles.producto'])->findOrFail($num_factura);
+
+            if (!$factura->cliente) {
+                return response()->json(['error' => 'La factura no tiene un cliente asignado'], 404);
+            }
+
+            return response()->json([
+                'numero' => str_pad($factura->num_factura, 6, '0', STR_PAD_LEFT),
+                'fecha' => $factura->fecha_factura ? $factura->fecha_factura->format('Y-m-d') : date('Y-m-d'),
+                'cliente_nombre' => $factura->cliente->nombre,
+                'cliente_ruc' => $factura->cliente->ruc,
+                'total' => (float)$factura->total,
+                'detalles' => $factura->detalles->map(function($d) {
+                    return [
+                        'descripcion' => ($d->producto->codigo ?? '') . ' - ' . ($d->producto->nombre ?? 'Producto'),
+                        'cantidad' => $d->cantidad,
+                        'unidad' => $d->unidad,
+                        'precio_unitario' => (float)$d->precio_unitario,
+                        'subtotal' => (float)$d->subtotal_linea
+                    ];
+                })
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function anular($num_factura)
+    {
+        try {
+            // Usamos findOrFail para que si no existe dispare el catch
+            $factura = Factura::findOrFail($num_factura);
+
+            if ($factura->estado === 'anulada') {
+                return response()->json(['success' => false, 'message' => 'La factura ya está anulada.'], 400);
+            }
+
+            $factura->estado = 'anulada';
+            $factura->save();
+
+            return response()->json([
+                'success' => true, 
+                'message' => 'Factura N° ' . $num_factura . ' anulada exitosamente.'
+            ]);
+
+        } catch (\Exception $e) {
+            // Esto devolverá el error real para que lo veas en la consola
+            return response()->json([
+                'success' => false, 
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }

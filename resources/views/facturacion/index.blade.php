@@ -33,8 +33,9 @@
                 <select class="form-select" name="cliente">
                     <option value="">Todos los clientes</option>
                     @foreach($clientes ?? [] as $cliente)
-                        <option value="{{ $cliente->id }}" {{ request('cliente') == $cliente->id ? 'selected' : '' }}>
-                            {{ $cliente->nombre }}
+                        {{-- Cambiamos $cliente->id por $cliente->ruc --}}
+                        <option value="{{ $cliente->ruc }}" {{ request('cliente') == $cliente->ruc ? 'selected' : '' }}>
+                            {{ $cliente->nombre }} ({{ $cliente->ruc }})
                         </option>
                     @endforeach
                 </select>
@@ -72,132 +73,50 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @forelse($facturas ?? [] as $factura)
+                    @forelse($facturas as $factura)
                         <tr>
-                            <td class="fw-medium">{{ $factura->numero }}</td>
+                            <td class="fw-medium">{{ $factura->num_factura }}</td>
                             <td>
-                                <div class="fw-medium">{{ $factura->cliente->nombre ?? 'N/A' }}</div>
-                                <div class="text-secondary" style="font-size: 0.75rem;">{{ $factura->cliente->ruc ?? '' }}</div>
+                                <div class="fw-medium">{{ $factura->cliente->nombre ?? 'Sin Nombre' }}</div>
+                                <div class="text-secondary" style="font-size: 0.75rem;">
+                                    {{ $factura->ruc_cliente_fk }}
+                                </div>
                             </td>
-                            <td>{{ $factura->fecha->format('d/m/Y') }}</td>
+                            <td>
+                                @if($factura->fecha_factura)
+                                    {{ $factura->fecha_factura->format('d/m/Y') }}
+                                @else
+                                    <span class="text-muted">Sin fecha</span>
+                                @endif
+                            </td>
                             <td>B/. {{ number_format($factura->subtotal, 2) }}</td>
                             <td>B/. {{ number_format($factura->itbms, 2) }}</td>
                             <td class="fw-medium">B/. {{ number_format($factura->total, 2) }}</td>
                             <td>
-                                <span class="badge badge-{{ $factura->estado === 'pagada' ? 'success' : ($factura->estado === 'pendiente' ? 'warning' : 'danger') }}">
-                                    {{ ucfirst($factura->estado) }}
-                                </span>
+                            <span class="badge {{ $factura->estado === 'pagada' ? 'bg-success' : ($factura->estado === 'anulada' ? 'bg-danger' : 'bg-warning') }}">
+                                {{ ucfirst($factura->estado) }}
+                            </span>
                             </td>
                             <td class="text-end">
                                 <div class="btn-group">
-                                    <a href="{{ route('facturacion.show', $factura) }}" class="btn btn-sm btn-light" title="Ver">
+                                    <button type="button" class="btn btn-sm btn-light" onclick="vistaPreviaHistorial('{{ $factura->num_factura }}')">
                                         <i class="bi bi-eye"></i>
-                                    </a>
-                                    <a href="{{ route('facturacion.print', $factura) }}" class="btn btn-sm btn-light" title="Imprimir" target="_blank">
-                                        <i class="bi bi-printer"></i>
-                                    </a>
-                                    <button type="button" class="btn btn-sm btn-light" title="Enviar por correo"
-                                            onclick="enviarCorreo({{ $factura->id }})">
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-light" onclick="enviarCorreo('{{ $factura->num_factura }}')">
                                         <i class="bi bi-envelope"></i>
                                     </button>
+                                    @if($factura->estado !== 'anulada')
+                                        <button type="button" class="btn btn-sm btn-light text-danger" onclick="anularFactura('{{ $factura->num_factura }}')" title="Anular Factura">
+                                            <i class="bi bi-x-circle"></i>
+                                        </button>
+                                    @endif
                                 </div>
                             </td>
                         </tr>
                     @empty
-                        <!-- Demo data -->
                         <tr>
-                            <td class="fw-medium">FAC-2024-0012</td>
-                            <td>
-                                <div class="fw-medium">Comercial El Triunfo, S.A.</div>
-                                <div class="text-secondary" style="font-size: 0.75rem;">155634567-2-2020</div>
-                            </td>
-                            <td>{{ now()->format('d/m/Y') }}</td>
-                            <td>B/. 220.09</td>
-                            <td>B/. 15.41</td>
-                            <td class="fw-medium">B/. 235.50</td>
-                            <td><span class="badge badge-success">Pagada</span></td>
-                            <td class="text-end">
-                                <div class="btn-group">
-                                    <button class="btn btn-sm btn-light"><i class="bi bi-eye"></i></button>
-                                    <button class="btn btn-sm btn-light"><i class="bi bi-printer"></i></button>
-                                    <button class="btn btn-sm btn-light"><i class="bi bi-envelope"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="fw-medium">FAC-2024-0011</td>
-                            <td>
-                                <div class="fw-medium">Mini Super Central</div>
-                                <div class="text-secondary" style="font-size: 0.75rem;">8-456-789</div>
-                            </td>
-                            <td>{{ now()->format('d/m/Y') }}</td>
-                            <td>B/. 168.22</td>
-                            <td>B/. 11.78</td>
-                            <td class="fw-medium">B/. 180.00</td>
-                            <td><span class="badge badge-success">Pagada</span></td>
-                            <td class="text-end">
-                                <div class="btn-group">
-                                    <button class="btn btn-sm btn-light"><i class="bi bi-eye"></i></button>
-                                    <button class="btn btn-sm btn-light"><i class="bi bi-printer"></i></button>
-                                    <button class="btn btn-sm btn-light"><i class="bi bi-envelope"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="fw-medium">FAC-2024-0010</td>
-                            <td>
-                                <div class="fw-medium">Abarrotería Don José</div>
-                                <div class="text-secondary" style="font-size: 0.75rem;">4-234-567</div>
-                            </td>
-                            <td>{{ now()->subDay()->format('d/m/Y') }}</td>
-                            <td>B/. 504.44</td>
-                            <td>B/. 35.31</td>
-                            <td class="fw-medium">B/. 539.75</td>
-                            <td><span class="badge badge-warning">Pendiente</span></td>
-                            <td class="text-end">
-                                <div class="btn-group">
-                                    <button class="btn btn-sm btn-light"><i class="bi bi-eye"></i></button>
-                                    <button class="btn btn-sm btn-light"><i class="bi bi-printer"></i></button>
-                                    <button class="btn btn-sm btn-light"><i class="bi bi-envelope"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="fw-medium">FAC-2024-0009</td>
-                            <td>
-                                <div class="fw-medium">Super La Economía</div>
-                                <div class="text-secondary" style="font-size: 0.75rem;">155789012-2-2019</div>
-                            </td>
-                            <td>{{ now()->subDay()->format('d/m/Y') }}</td>
-                            <td>B/. 1,098.13</td>
-                            <td>B/. 76.87</td>
-                            <td class="fw-medium">B/. 1,175.00</td>
-                            <td><span class="badge badge-success">Pagada</span></td>
-                            <td class="text-end">
-                                <div class="btn-group">
-                                    <button class="btn btn-sm btn-light"><i class="bi bi-eye"></i></button>
-                                    <button class="btn btn-sm btn-light"><i class="bi bi-printer"></i></button>
-                                    <button class="btn btn-sm btn-light"><i class="bi bi-envelope"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="fw-medium">FAC-2024-0008</td>
-                            <td>
-                                <div class="fw-medium">Tienda La Bendición</div>
-                                <div class="text-secondary" style="font-size: 0.75rem;">8-789-012</div>
-                            </td>
-                            <td>{{ now()->subDays(2)->format('d/m/Y') }}</td>
-                            <td>B/. 79.91</td>
-                            <td>B/. 5.59</td>
-                            <td class="fw-medium">B/. 85.50</td>
-                            <td><span class="badge badge-success">Pagada</span></td>
-                            <td class="text-end">
-                                <div class="btn-group">
-                                    <button class="btn btn-sm btn-light"><i class="bi bi-eye"></i></button>
-                                    <button class="btn btn-sm btn-light"><i class="bi bi-printer"></i></button>
-                                    <button class="btn btn-sm btn-light"><i class="bi bi-envelope"></i></button>
-                                </div>
+                            <td colspan="8" class="text-center py-5 text-muted">
+                                No se encontraron registros en la base de datos.
                             </td>
                         </tr>
                     @endforelse
@@ -216,6 +135,38 @@
 
 @push('scripts')
 <script>
+    async function vistaPreviaHistorial(numFactura) {
+        try {
+            // 1. Obtener datos
+            const response = await fetch(`/facturacion/${numFactura}/datos-pdf`);
+            if (!response.ok) throw new Error('No se encontraron datos de la factura');
+            
+            const datosFactura = await response.json();
+
+            // 2. Generar el PDF usando tu endpoint existente
+            const resPdf = await fetch('/facturacion/generar-pdf', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                },
+                body: JSON.stringify(datosFactura)
+            });
+
+            if (resPdf.ok) {
+                const blob = await resPdf.blob();
+                const url = URL.createObjectURL(blob);
+                window.open(url, '_blank'); // Abre la vista previa
+            } else {
+                alert("Error al procesar el PDF");
+            }
+        } catch (error) {
+            console.error("Error:", error);
+            alert("No se pudo generar la vista previa: " + error.message);
+        }
+    }
+
+
 function enviarCorreo(facturaId) {
     if (confirm('¿Desea enviar esta factura por correo electrónico al cliente?')) {
         // AJAX call to send email
@@ -233,6 +184,42 @@ function enviarCorreo(facturaId) {
         .catch(error => {
             alert('Error al enviar la factura');
         });
+    }
+}
+
+async function anularFactura(numFactura) {
+    if (!confirm(`¿Desea anular la factura N° ${numFactura}?`)) return;
+
+    try {
+        const response = await fetch(`/facturacion/${numFactura}/anular`, {
+            method: 'POST', // Cambiado a POST para coincidir con web.php
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json' // Esto le dice a Laravel que queremos JSON, no HTML
+            }
+        });
+
+        // Verificamos si la respuesta es realmente JSON antes de parsear
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.indexOf("application/json") !== -1) {
+            const data = await response.json();
+            
+            if (response.ok && data.success) {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert("Error: " + (data.error || data.message));
+            }
+        } else {
+            // Si el servidor mandó un error en HTML, lo capturamos aquí
+            const textError = await response.text();
+            console.error("Error del servidor (HTML):", textError);
+            alert("El servidor devolvió un error interno. Revisa la consola (F12).");
+        }
+    } catch (error) {
+        console.error("Error en la petición:", error);
+        alert("No se pudo conectar con el servidor.");
     }
 }
 </script>

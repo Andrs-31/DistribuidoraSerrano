@@ -75,6 +75,12 @@ Route::middleware('auth')->group(function () {
         
         // Endpoint auxiliar: productos por cliente 
         Route::get('/facturacion/clientes/{clienteId}/productos', [ListaPrecioController::class, 'porCliente'])->name('facturacion.productos-por-cliente');
+        // Esta obtiene los datos (usada por el ojito)
+        Route::get('/facturacion/{factura}/datos-pdf', [FacturacionController::class, 'obtenerDatosPdf']);
+        // Esta genera el PDF (la que te daba error 405, debe ser POST)
+        Route::post('/facturacion/generar-pdf', [FacturacionController::class, 'generarPdf']);
+        // Cambiamos a POST para evitar problemas de compatibilidad con algunos navegadores
+        Route::post('/facturacion/{factura}/anular', [App\Http\Controllers\FacturacionController::class, 'anular'])->name('facturacion.anular');
     });
 
     // Reportes (requieren permiso 'reportes')
