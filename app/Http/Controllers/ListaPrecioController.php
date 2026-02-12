@@ -6,12 +6,14 @@ use Illuminate\Http\Request;
 use App\Models\Cliente;
 use App\Models\ListaPrecio;
 use App\Models\Producto;
+use App\Models\GrupoCliente;
 
 class ListaPrecioController extends Controller
 {
     public function porCliente($clienteId)
     {
-        $cliente = Cliente::findOrFail($clienteId);
+        $cliente = Cliente::where('ruc', $clienteId)->firstOrFail();
+
         
         // Si el cliente tiene grupo asignado, obtener precios de ese grupo
         // Si no tiene grupo, obtener todos los productos
@@ -70,4 +72,88 @@ class ListaPrecioController extends Controller
         return response()->json($productosData);
     }
 
+/**
+     * Pantalla: Precios por grupo para un producto
+     */
+    public function indexPorProducto(Producto $producto)
+{
+    $grupos = GrupoCliente::orderBy('nombre')->get();
+
+    $precios = ListaPrecio::where('id_producto_fk', $producto->id_producto)
+    ->orderBy('id_grupo_fk')
+    ->orderBy('unidad')
+    ->get();
+
+
+    return view('productos.precios', compact('producto', 'grupos', 'precios'));
+}
+
+public function upsertPrecio(Request $request, Producto $producto)
+{
+    $request->validate([
+        'id_grupo_fk' => 'required|exists:grupo_clientes,id_grupo',
+        'unidad' => 'required|string|max:20',
+        'precio_base' => 'required|numeric|min:0',
+        'estado' => 'required|in:0,1',
+    ]);
+
+    ListaPrecio::updateOrCreate(
+        [
+            'id_producto_fk' => $producto->id_producto,
+            'id_grupo_fk'    => $request->id_grupo_fk,
+            'unidad'         => $request->unidad, 
+        ],
+        [
+            'precio_base' => $request->precio_base,
+            'estado'      => $request->estado,
+        ]
+    );
+
+    return back()->with('success', 'Precio guardado correctamente.');
+}
+
+public function desactivarPrecio(Producto $producto, ListaPrecio $listaPrecio)
+{
+    if ($listaPrecio->id_producto_fk != $producto->id_producto) {
+        abort(404);
+    }
+
+    $listaPrecio->update(['estado' => 0]);
+
+    return back()->with('success', 'Precio desactivado.');
+}
+
+    /**
+     * Asignar “producto para un cliente” (realmente: precio para el grupo del cliente)
+     */
+    public function upsertPrecioPorCliente(Request $request, Producto $producto)
+    {
+        $data = $request->validate([
+            'cliente_ruc' => ['required', 'string', 'max:70'],
+            'unidad'      => ['required', 'string', 'max:50'],
+            'precio_base' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $cliente = Cliente::where('ruc', $data['cliente_ruc'])->firstOrFail();
+
+        if (!$cliente->id_grupo_fk) {
+            return back()->withErrors([
+                'cliente_ruc' => 'Este cliente no tiene grupo asignado.',
+            ]);
+        }
+
+        ListaPrecio::updateOrCreate(
+            [
+                'id_producto_fk' => $producto->id_producto,
+                'id_grupo_fk'    => (int)$cliente->id_grupo_fk,
+                'unidad'         => $data['unidad'],
+            ],
+            [
+                'precio_base' => $data['precio_base'],
+                'estado'      => 1,
+            ]
+        );
+
+        return back()->with('success', 'Asignación creada/actualizada para el grupo del cliente.');
+    }
 }

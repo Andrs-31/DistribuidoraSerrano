@@ -10,8 +10,11 @@ use App\Http\Controllers\ListaPrecioController;
 use App\Models\Producto;
 use App\Models\Cliente;
 
+
 use App\Http\Controllers\ClienteController;
 use App\Http\Controllers\UbicacionController;
+
+use App\Http\Controllers\ProductoController;
 
 # Rutas básicas para la navegación del proyecto
 Route::get('/', function () {
@@ -32,17 +35,35 @@ Route::middleware('auth')->group(function () {
     });
 
 
+    // // Productos (requieren permiso 'gestion_productos')
+    // Route::middleware('permiso:gestion_productos')->group(function () {
+    //     Route::get('/productos', function () { return view('productos.index'); })->name('productos.index');
+    //     Route::get('/productos/create', function () { return view('productos.create'); })->name('productos.create');
+    //     Route::get('/productos/{producto}/edit', function ($producto) { return view('productos.edit', compact('producto')); })->name('productos.edit');
+    //     Route::get('/productos/{producto}', function ($producto) { return view('productos.show', compact('producto')); })->name('productos.show');
+
+    //     // Productos - endpoints
+    //     Route::post('/productos', function (Request $r) { return redirect()->route('productos.index')->with('success', 'Producto guardado (simulado).'); })->name('productos.store');
+    //     Route::match(['put','patch'], '/productos/{producto}', function ($producto) { return redirect()->route('productos.show', $producto)->with('success', 'Producto actualizado (simulado).'); })->name('productos.update');
+    //     Route::delete('/productos/{producto}', function ($producto) { return redirect()->route('productos.index')->with('success', 'Producto eliminado (simulado).'); })->name('productos.destroy');
+    // });
+
     // Productos (requieren permiso 'gestion_productos')
     Route::middleware('permiso:gestion_productos')->group(function () {
-        Route::get('/productos', function () { return view('productos.index'); })->name('productos.index');
-        Route::get('/productos/create', function () { return view('productos.create'); })->name('productos.create');
-        Route::get('/productos/{producto}/edit', function ($producto) { return view('productos.edit', compact('producto')); })->name('productos.edit');
-        Route::get('/productos/{producto}', function ($producto) { return view('productos.show', compact('producto')); })->name('productos.show');
+        Route::resource('productos', ProductoController::class);
 
-        // Productos - endpoints
-        Route::post('/productos', function (Request $r) { return redirect()->route('productos.index')->with('success', 'Producto guardado (simulado).'); })->name('productos.store');
-        Route::match(['put','patch'], '/productos/{producto}', function ($producto) { return redirect()->route('productos.show', $producto)->with('success', 'Producto actualizado (simulado).'); })->name('productos.update');
-        Route::delete('/productos/{producto}', function ($producto) { return redirect()->route('productos.index')->with('success', 'Producto eliminado (simulado).'); })->name('productos.destroy');
+        Route::get('productos/{producto}/precios', [ListaPrecioController::class, 'indexPorProducto'])
+            ->name('productos.precios');
+
+        Route::post('productos/{producto}/precios', [ListaPrecioController::class, 'upsertPrecio'])
+            ->name('productos.precios.upsert');
+
+        Route::delete('productos/{producto}/precios/{listaPrecio}', [ListaPrecioController::class, 'desactivarPrecio'])
+            ->name('productos.precios.desactivar');
+
+        Route::post('productos/{producto}/precios/por-cliente', [ListaPrecioController::class, 'upsertPrecioPorCliente'])
+            ->name('productos.precios.porCliente');
+
     });
 
     // Usuarios (requieren permiso 'gestion_usuarios')

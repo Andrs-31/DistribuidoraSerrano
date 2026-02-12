@@ -13,9 +13,28 @@ class Producto extends Model
 
     protected $fillable = [
         'nombre',
+        'nombre_key',
         'estado',
     ];
 
+    public function getRouteKeyName()
+    {
+        return 'id_producto';
+    }
+
+    public function precios()
+    {
+        return $this->hasMany(ListaPrecio::class, 'id_producto_fk', 'id_producto');
+    }
+
+    public function precioBase()
+    {
+        return $this->hasOne(ListaPrecio::class, 'id_producto_fk', 'id_producto')
+            ->where('id_grupo_fk', 1)
+            ->where('estado', 1);
+    }
+
+    // ANDFRESSS MORANNN
     public function listasPrecio()
     {
         return $this->hasMany(ListaPrecio::class, 'id_producto_fk', 'id_producto');
