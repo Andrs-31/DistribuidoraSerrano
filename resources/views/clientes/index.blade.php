@@ -85,6 +85,7 @@
                             </td>
                             <td class="text-end">
                                 <div class="btn-group">
+                                    
                                     <a href="{{ route('clientes.show', $cliente->ruc) }}" class="btn btn-sm btn-light" title="Ver">
                                         <i class="bi bi-eye"></i>
                                     </a>
@@ -102,6 +103,11 @@
                                             <i class="bi bi-person-plus"></i>
                                         </button>
                                     @endif
+                                    <a href="{{ route('clientes.precios', $cliente) }}"
+                                    class="btn btn-sm btn-light text-info"
+                                    title="Ver lista de precios del cliente">
+                                    <i class="bi bi-person-lines-fill"></i>
+                                    </a>
                                 </div>
 
                                 <!-- Toggle Modal (activar/desactivar) -->
@@ -129,6 +135,7 @@
                                     </div>
                                 </div>
                             </td>
+
                         </tr>
                     @empty
                         <tr>

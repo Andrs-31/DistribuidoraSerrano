@@ -40,50 +40,53 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    
+    // --- LÓGICA DE PROVINCIAS Y DISTRITOS ---
     const provinciaSelect = document.getElementById('provincia');
     const distritoSelect = document.getElementById('distrito');
 
-    // Cargar distritos cuando se selecciona una provincia
     provinciaSelect.addEventListener('change', function() {
         const codigoProvincia = this.value;
-
         if (!codigoProvincia) {
             distritoSelect.disabled = true;
             distritoSelect.innerHTML = '<option value="">Seleccionar provincia primero...</option>';
             return;
         }
 
-        // Realizar AJAX para obtener los distritos
         fetch(`/distritos/${codigoProvincia}`)
             .then(response => response.json())
             .then(data => {
                 distritoSelect.innerHTML = '<option value="">Seleccionar distrito...</option>';
-
                 data.forEach(distrito => {
                     const option = document.createElement('option');
                     option.value = distrito.codigo_distrito;
                     option.textContent = distrito.nombre_distrito;
-
-                    // Si hay valor guardado en old(), seleccionarlo
-                    if (option.value === '{{ old('distrito', '') }}') {
-                        option.selected = true;
-                    }
-
+                    if (option.value === '{{ old('distrito', '') }}') option.selected = true;
                     distritoSelect.appendChild(option);
                 });
-
                 distritoSelect.disabled = false;
-            })
-            .catch(error => {
-                console.error('Error al cargar distritos:', error);
-                distritoSelect.innerHTML = '<option value="">Error al cargar distritos</option>';
-                distritoSelect.disabled = true;
             });
     });
 
-    // Si ya hay una provincia seleccionada (en caso de editar), cargar los distritos
-    if (provinciaSelect.value) {
-        provinciaSelect.dispatchEvent(new Event('change'));
+    if (provinciaSelect.value) provinciaSelect.dispatchEvent(new Event('change'));
+
+    // --- LÓGICA DE GRUPOS PERSONALIZADOS ---
+    const grupoSelect = document.getElementById('grupo_id');
+    const customGroupContainer = document.getElementById('custom_group_container'); // Asegúrate de que este ID esté en el partial
+
+    if(grupoSelect) {
+        grupoSelect.addEventListener('change', function() {
+            if (this.value === 'create_custom') {
+                customGroupContainer.classList.remove('d-none');
+            } else {
+                customGroupContainer.classList.add('d-none');
+            }
+        });
+
+        // Disparar al cargar por si hay errores de validación
+        if (grupoSelect.value === 'create_custom') {
+            customGroupContainer.classList.remove('d-none');
+        }
     }
 });
 </script>

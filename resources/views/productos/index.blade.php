@@ -69,8 +69,6 @@
                     <tr>
                         <th>Código</th>
                         <th>Producto</th>
-                        <th>Unidad</th>
-                        <th>Precio Base</th>
                         <th>Estado</th>
                         <th class="text-end">Acciones</th>
                     </tr>
@@ -83,8 +81,6 @@
                         <tr>
                             <td class="fw-medium">{{ $codigo }}</td>
                             <td class="fw-medium">{{ $producto->nombre }}</td>
-                            <td>{{ $producto->precioBase->unidad ?? '-' }}</td>
-                            <td class="fw-medium">B/. {{ number_format($producto->precioBase->precio_base ?? 0, 2) }}</td>
                             <td>
                                 <span class="badge badge-{{ $producto->estado == 1 ? 'success' : 'danger' }}">
                                     {{ $producto->estado == 1 ? 'Activo' : 'Inactivo' }}
@@ -92,49 +88,49 @@
                             </td>
                             <td class="text-end">
                                 <div class="btn-group">
-                                    <a href="{{ route('productos.show', $producto) }}" class="btn btn-sm btn-light" title="Ver">
-                                        <i class="bi bi-eye"></i>
-                                    </a>
-                                    <a href="{{ route('productos.edit', $producto) }}" class="btn btn-sm btn-light" title="Editar">
-                                        <i class="bi bi-pencil"></i>
-                                    </a>
-                                    <button type="button" class="btn btn-sm btn-light text-danger" title="Desactivar"
-                                            data-bs-toggle="modal" data-bs-target="#deleteModal{{ $producto->id_producto }}">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
+                                    @if($producto->estado == 1)
+                                        <button type="button" class="btn btn-sm btn-light text-warning" title="Desactivar"
+                                                data-bs-toggle="modal" data-bs-target="#toggleModal{{ $producto->id_producto }}">
+                                            <i class="bi bi-toggle-on"></i>
+                                        </button>
+                                    @else
+                                        <button type="button" class="btn btn-sm btn-light text-success" title="Activar"
+                                                data-bs-toggle="modal" data-bs-target="#toggleModal{{ $producto->id_producto }}">
+                                            <i class="bi bi-toggle-off text-success"></i>
+                                        </button>
+                                    @endif
                                 </div>
                                 <a href="{{ route('productos.precios', $producto) }}" 
-            class="btn btn-sm btn-light"
-            title="Administrar Precios">
-                <i class="bi bi-tags"></i>
-            </a>
+                                class="btn btn-sm btn-light"
+                                title="Administrar Precios">
+                                    <i class="bi bi-tags"></i>
+                                </a>
 
 
-                                <!-- Modal Desactivar -->
-                                <div class="modal fade" id="deleteModal{{ $producto->id_producto }}" tabindex="-1">
+                                <!-- Toggle Modal (activar/desactivar) -->
+                                <div class="modal fade" id="toggleModal{{ $producto->id_producto }}" tabindex="-1">
                                     <div class="modal-dialog modal-dialog-centered">
                                         <div class="modal-content">
                                             <div class="modal-header border-bottom">
-                                                <h5 class="modal-title">Confirmar desactivación</h5>
+                                                <h5 class="modal-title">{{ $producto->estado == 1 ? 'Confirmar desactivación' : 'Confirmar activación' }}</h5>
                                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                             </div>
                                             <div class="modal-body text-start">
-                                                <p class="mb-0">
-                                                    ¿Desea desactivar el producto <strong>{{ $producto->nombre }}</strong>?
-                                                </p>
+                                                <p class="mb-0">{!! $producto->estado == 1 ? "¿Está seguro de que desea desactivar al producto <strong>{$producto->nombre}</strong>?" : "¿Está seguro de que desea activar al producto <strong>{$producto->nombre}</strong>?" !!}</p>
                                             </div>
                                             <div class="modal-footer border-top">
                                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                                <form action="{{ route('productos.destroy', $producto) }}" method="POST" class="d-inline">
+                                                <form action="{{ route('productos.destroy', $producto->id_producto) }}" method="POST" class="d-inline">
                                                     @csrf
                                                     @method('DELETE')
-                                                    <button type="submit" class="btn btn-danger">Desactivar</button>
+                                                    <button type="submit" class="btn {{ $producto->estado == 1 ? 'btn-warning' : 'btn-success' }}">
+                                                        {{ $producto->estado == 1 ? 'Desactivar' : 'Activar' }}
+                                                    </button>
                                                 </form>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-
                             </td>
                         </tr>
                     @empty

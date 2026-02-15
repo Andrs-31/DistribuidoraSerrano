@@ -247,4 +247,47 @@ class FacturacionController extends Controller
             ], 500);
         }
     }
+
+    public function enviarEmail($num_factura)
+    {
+       
+        try {
+            // Buscamos la factura en la base de datos
+            $factura = Factura::with(['cliente', 'detalles.producto'])->findOrFail($num_factura);
+            $cliente = $factura->cliente;
+            if (!$cliente || !$cliente->email) {
+                return response()->json(['success' => false, 'message' => 'El cliente no tiene un email válido.'], 400);
+            }
+                 // Recibe datos de la factura en JSON y genera PDF
+                $data = $request->json()->all();
+
+                // Extraer datos
+                $cliente_nombre = $data['cliente_nombre'] ?? 'Cliente';
+                $cliente_ruc = $data['cliente_ruc'] ?? '';
+                $numero = $data['numero'] ?? '';
+                $fecha = $data['fecha'] ?? date('Y-m-d');
+                $detalles = $data['detalles'] ?? [];
+                $total = $data['total'] ?? 0;
+
+                // Datos de la empresa (hardcoded, idealmente de config)
+                $empresa = [
+                    'nombre' => 'Distribuidora Serrano',
+                    'ruc' => '12345678-1-2020',
+                    'ciudad' => 'Ciudad de Panamá, Panamá',
+                ];
+
+                // Generar HTML para PDF
+                $html = view('facturacion.pdf', compact('empresa', 'cliente_nombre', 'cliente_ruc', 'numero', 'fecha', 'detalles', 'total'))->render();
+
+        // Generar PDF
+        $pdf = Pdf::loadHTML($html)->setPaper('a4');
+
+        return $pdf->download("factura_{$numero}_{$fecha}.pdf");
+            
+            return response()->json(['success' => true, 'message' => 'Factura enviada por email correctamente.']);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Error al enviar email: ' . $e->getMessage()], 500);
+        }
+        
+    }
 }

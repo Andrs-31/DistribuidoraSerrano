@@ -80,19 +80,36 @@
             <label for="grupo_id" class="form-label">Grupo de Cliente <span class="text-danger">*</span></label>
             <select class="form-select @error('grupo_id') is-invalid @enderror" id="grupo_id" name="grupo_id" required>
                 <option value="">Seleccionar grupo...</option>
-                @foreach($grupos ?? [] as $grupo)
-                    <option value="{{ $grupo->id_grupo }}" {{ old('grupo_id', $cliente->id_grupo_fk ?? '') == $grupo->id_grupo ? 'selected' : '' }}>
-                        {{ $grupo->nombre}}
+                
+                <optgroup label="Opciones de creación">
+                    <option value="use_client_name" {{ old('grupo_id') == 'use_client_name' ? 'selected' : '' }}>
+                        -- No pertenezco a un grupo (Crear con mi nombre) --
                     </option>
-                @endforeach
-                <option value="create_new" {{ old('grupo_id') == 'create_new' ? 'selected' : '' }}>
-                    + Crear nuevo grupo (usar nombre del cliente)
-                </option>
+                    <option value="create_custom" {{ old('grupo_id') == 'create_custom' ? 'selected' : '' }}>
+                        -- Crear un nuevo grupo con nombre personalizado --
+                    </option>
+                </optgroup>
+
+                <optgroup label="Grupos Existentes">
+                    @foreach($grupos ?? [] as $grupo)
+                        <option value="{{ $grupo->id_grupo }}" {{ old('grupo_id', $cliente->id_grupo_fk ?? '') == $grupo->id_grupo ? 'selected' : '' }}>
+                            {{ $grupo->nombre }}
+                        </option>
+                    @endforeach
+                </optgroup>
             </select>
-            @error('grupo_id')
-                <div class="invalid-feedback">{{ $message }}</div>
-            @enderror
+            @error('grupo_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
             <div class="form-text">El grupo determina la lista de precios aplicable</div>
+        </div>
+    </div>
+
+    <div id="custom_group_container" class="col-md-6 d-none">
+        <div class="mb-3">
+            <label for="nuevo_grupo_nombre" class="form-label text-primary">Nombre del Nuevo Grupo <span class="text-danger">*</span></label>
+            <input type="text" class="form-control border-primary @error('nuevo_grupo_nombre') is-invalid @enderror" 
+                   id="nuevo_grupo_nombre" name="nuevo_grupo_nombre" 
+                   value="{{ old('nuevo_grupo_nombre') }}" placeholder="Ej: Clientes Mayoristas VIP">
+            @error('nuevo_grupo_nombre') <div class="invalid-feedback">{{ $message }}</div> @enderror
         </div>
     </div>
 
@@ -159,6 +176,25 @@
 
 <script>
 // ===================== NOMBRE / RAZÓN SOCIAL =====================
+
+document.addEventListener('DOMContentLoaded', function() {
+    const grupoSelect = document.getElementById('grupo_id');
+    const customContainer = document.getElementById('custom_group_container');
+
+    function toggleCustomGroup() {
+        if (grupoSelect.value === 'create_custom') {
+            customContainer.classList.remove('d-none');
+        } else {
+            customContainer.classList.add('d-none');
+        }
+    }
+
+    grupoSelect.addEventListener('change', toggleCustomGroup);
+    
+    // Ejecutar al cargar por si hay errores de validación (old)
+    toggleCustomGroup();
+});
+
 function validarNombreKeypress(event) {
     const char = event.key;
     const input = event.target;

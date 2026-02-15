@@ -64,6 +64,11 @@ Route::middleware('auth')->group(function () {
         Route::post('productos/{producto}/precios/por-cliente', [ListaPrecioController::class, 'upsertPrecioPorCliente'])
             ->name('productos.precios.porCliente');
 
+        Route::get('clientes/{cliente}/precios', [ListaPrecioController::class, 'indexPorCliente'])
+        ->name('clientes.precios');
+
+        
+
     });
 
     // Usuarios (requieren permiso 'gestion_usuarios')

@@ -11,15 +11,7 @@ use Illuminate\Support\Str;
 
 class ProductoController extends Controller
 {
-    private function normalizarNombre(string $nombre): string
-    {
-        // 1) quita acentos -> ascii
-        // 2) lowercase
-        // 3) colapsa espacios
-        $n = Str::of($nombre)->ascii()->lower();
-        $n = preg_replace('/\s+/', ' ', trim((string)$n));
-        return $n;
-    }
+    
 
     public function index(Request $request)
 {
@@ -71,44 +63,24 @@ class ProductoController extends Controller
     }
 
     public function store(Request $request)
-    {
-        $data = $request->validate([
-            'nombre'      => ['required', 'string', 'max:255'],
-            'unidad'      => ['required', 'string', 'max:50'],
-            'precio_base' => ['required', 'numeric', 'min:0'],
-            'estado'      => ['required', 'in:0,1'],
-        ]);
+        {
+           $data = $request->validate(['nombre' => ['required', 'string', 'max:255', 'unique:productos,nombre'],
+            ], [
+                'nombre.unique' => 'Este producto ya existe.',
+                'nombre.required' => 'El nombre del producto es obligatorio.',
+            ]);
 
-        $nombreKey = $this->normalizarNombre($data['nombre']);
+            DB::transaction(function () use ($data) {
+                // Se crea el producto con estado activo (1) por defecto
+                Producto::create([
+                    'nombre' => $data['nombre'],
+                    'estado' => 1,
+                ]);
+            });
 
-        // No repetir productos (ignorando mayus/acentos)
-        $existe = Producto::where('nombre_key', $nombreKey)->exists();
-        if ($existe) {
-            return back()
-                ->withErrors(['nombre' => 'Este producto ya existe'])
-                ->withInput();
+            return redirect()->route('productos.index')
+                ->with('success', 'Producto creado correctamente.');
         }
-
-        DB::transaction(function () use ($data, $nombreKey) {
-            $producto = Producto::create([
-                'nombre'      => $data['nombre'],
-                'nombre_key'  => $nombreKey,
-                'estado'      => (int)$data['estado'],
-            ]);
-
-            
-            ListaPrecio::create([
-                'id_producto_fk' => $producto->id_producto,
-                'id_grupo_fk'    => 1,
-                'unidad'         => $data['unidad'],
-                'precio_base'    => $data['precio_base'],
-                'estado'         => 1,
-            ]);
-        });
-
-        return redirect()->route('productos.index')
-            ->with('success', 'Producto creado correctamente.');
-    }
 
     public function show(Producto $producto)
     {
@@ -126,61 +98,44 @@ class ProductoController extends Controller
     {
         $data = $request->validate([
             'nombre'      => ['required', 'string', 'max:255'],
-            'unidad'      => ['required', 'string', 'max:50'],
-            'precio_base' => ['required', 'numeric', 'min:0'],
-            'estado'      => ['required', 'in:0,1'],
-        ]);
+            'estado'      => ['required', 'in:0,1']],
+            [
+                'nombre.required' => 'El nombre del producto es obligatorio.',
+            ]);
 
-        $nombreKey = $this->normalizarNombre($data['nombre']);
 
-        // Evitar duplicados excepto el mismo registro
-        $existe = Producto::where('nombre_key', $nombreKey)
-            ->where('id_producto', '!=', $producto->id_producto)
-            ->exists();
-
-        if ($existe) {
-            return back()
-                ->withErrors(['nombre' => 'Ya existe otro producto con este nombre (ignorando mayúsculas/acentos).'])
-                ->withInput();
-        }
-
-        DB::transaction(function () use ($producto, $data, $nombreKey) {
+        DB::transaction(function () use ($producto, $data) {
             $producto->update([
                 'nombre'     => $data['nombre'],
-                'nombre_key' => $nombreKey,
                 'estado'     => (int)$data['estado'],
             ]);
 
-            // Actualiza precio base para grupo 1
-            ListaPrecio::updateOrCreate(
-                [
-                    'id_producto_fk' => $producto->id_producto,
-                    'id_grupo_fk'    => 1,
-                ],
-                [
-                    'unidad'      => $data['unidad'],
-                    'precio_base' => $data['precio_base'],
-                    'estado'      => 1,
-                ]
-            );
+            // Si el producto se desactiva, también se desactivan sus precios
+            if ($data['estado'] == 0) {
+                ListaPrecio::where('id_producto_fk', $producto->id_producto)
+                    ->update(['estado' => 0]);
+            }               
         });
 
         return redirect()->route('productos.index')
             ->with('success', 'Producto actualizado correctamente.');
     }
 
-    // “Eliminar” = desactivar 
+    
     public function destroy(Producto $producto)
     {
-        DB::transaction(function () use ($producto) {
-            $producto->update(['estado' => 0]);
+        $producto = Producto::findOrFail($producto->id_producto);
 
-            //  desactivar precios del producto
-            ListaPrecio::where('id_producto_fk', $producto->id_producto)
-                ->update(['estado' => 0]);
-        });
+        // Toggle estado: 1 -> 0 (desactivar), 0 -> 1 (activar)
+        $producto->estado = $producto->estado == 1 ? 0 : 1;
+        $producto->save();
+        // Si el producto se desactiva, también se desactivan sus precios
+            if ($producto->estado == 0) {
+                ListaPrecio::where('id_producto_fk', $producto->id_producto)
+                    ->update(['estado' => 0]);
+            }       
+        $mensaje = $producto->estado == 1 ? 'Producto activado correctamente' : 'Producto desactivado correctamente';
 
-        return redirect()->route('productos.index')
-            ->with('success', 'Producto desactivado correctamente.');
+        return redirect()->route('productos.index')->with('success', $mensaje);
     }
 }

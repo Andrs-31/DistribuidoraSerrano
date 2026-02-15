@@ -50,54 +50,63 @@ class ClienteController extends Controller
     }
 
     public function store(Request $request)
-    {
-        // Validar datos básicos
-        $request->validate([
-            'ruc'        => 'required|unique:clientes,ruc',
-            'nombre'     => 'required|string|max:255',
-            'email'      => 'nullable|email|unique:clientes,email',
-            'telefono'   => 'required|string|max:50',
-            'grupo_id'   => 'required',
-            'estado'     => 'required|in:0,1',
-            'provincia'  => 'required',
-            'distrito'   => 'required',
-            'direccion'  => 'required'
-        ]);
+{
+    // 1. Validación
+    $request->validate([
+        'ruc'                => 'required|unique:clientes,ruc',
+        'nombre'             => 'required|string|max:255',
+        'email'              => 'nullable|email|unique:clientes,email',
+        'telefono'           => 'required|string|max:50',
+        'grupo_id'           => 'required',
+        'nuevo_grupo_nombre' => 'required_if:grupo_id,create_custom', // Solo obligatorio si elige manual
+        'estado'             => 'required|in:0,1',
+        'provincia'          => 'required',
+        'distrito'           => 'required',
+        'direccion'          => 'required'
+    ]);
 
-        // Manejar creación de nuevo grupo si se selecciona "create_new"
+    // 2. Lógica de Grupo
+    $grupoId = null;
+
+    if ($request->grupo_id === 'use_client_name') {
+        // Opción: "No pertenezco a un grupo" -> Crea grupo con nombre del cliente
+        $nuevoGrupo = GrupoCliente::create([
+            'nombre' => $request->nombre,
+            'estado' => 1,
+        ]);
+        $grupoId = $nuevoGrupo->id_grupo;
+
+    } elseif ($request->grupo_id === 'create_custom') {
+        // Opción: "Crear grupo con nombre personalizado"
+        $nuevoGrupo = GrupoCliente::create([
+            'nombre' => $request->nuevo_grupo_nombre,
+            'estado' => 1,
+        ]);
+        $grupoId = $nuevoGrupo->id_grupo;
+
+    } else {
+        // Opción: Selección de un grupo ya existente
         $grupoId = $request->grupo_id;
-        if ($request->grupo_id === 'create_new') {
-            $grupo = GrupoCliente::create([
-                'nombre' => $request->nombre,
-                'estado' => 1,
-            ]);
-            $grupoId = $grupo->id_grupo;
-        } else {
-            // Validar que el grupo existe
-            $request->validate([
-                'grupo_id' => 'exists:grupo_clientes,id_grupo'
-            ]);
-        }
-
-        // Obtener información de provincia y distrito
-        $provincia = Provincia::findOrFail($request->provincia);
-        $distrito = Distrito::findOrFail($request->distrito);
-
-        $direccionCompleta = "{$provincia->nombre_provincia}, {$distrito->nombre_distrito}, {$request->direccion}";
-
-        Cliente::create([
-            'ruc'         => $request->ruc,
-            'nombre'      => $request->nombre,
-            'telefono'    => $request->telefono,
-            'email'       => $request->email,
-            'direccion'   => $direccionCompleta,
-            'estado'      => $request->estado,
-            'id_grupo_fk' => $grupoId,
-        ]);
-
-        return redirect()->route('clientes.index')
-            ->with('success', 'Cliente registrado correctamente');
     }
+
+    // 3. Procesar Dirección
+    $provincia = Provincia::findOrFail($request->provincia);
+    $distrito = Distrito::findOrFail($request->distrito);
+    $direccionCompleta = "{$provincia->nombre_provincia}, {$distrito->nombre_distrito}, {$request->direccion}";
+
+    // 4. Crear Cliente
+    Cliente::create([
+        'ruc'         => $request->ruc,
+        'nombre'      => $request->nombre,
+        'telefono'    => $request->telefono,
+        'email'       => $request->email,
+        'direccion'   => $direccionCompleta,
+        'estado'      => $request->estado,
+        'id_grupo_fk' => $grupoId,
+    ]);
+
+    return redirect()->route('clientes.index')->with('success', 'Cliente registrado correctamente');
+}
 
     public function show($ruc)
     {
@@ -151,38 +160,48 @@ class ClienteController extends Controller
     {
         $cliente = Cliente::findOrFail($ruc);
 
+        // 1. Validación (Incluimos nuevo_grupo_nombre)
         $request->validate([
-            'nombre'     => 'required|string|max:255',
-            'email'      => 'nullable|email|unique:clientes,email,' . $cliente->ruc . ',ruc',
-            'telefono'   => 'required|string|max:50',
-            'estado'     => 'required|in:0,1',
-            'grupo_id'   => 'required',
-            'provincia'  => 'required',
-            'distrito'   => 'required',
-            'direccion'  => 'required'
+            'nombre'             => 'required|string|max:255',
+            'email'              => 'nullable|email|unique:clientes,email,' . $cliente->ruc . ',ruc',
+            'telefono'           => 'required|string|max:50',
+            'estado'             => 'required|in:0,1',
+            'grupo_id'           => 'required',
+            'nuevo_grupo_nombre' => 'required_if:grupo_id,create_custom',
+            'provincia'          => 'required',
+            'distrito'           => 'required',
+            'direccion'          => 'required'
         ]);
 
-        // Manejar creación de nuevo grupo si se selecciona "create_new"
-        $grupoId = $request->grupo_id;
-        if ($request->grupo_id === 'create_new') {
-            $grupo = GrupoCliente::create([
+        // 2. Lógica de Grupo (Igual que en store)
+        $grupoId = null;
+
+        if ($request->grupo_id === 'use_client_name') {
+            $nuevoGrupo = GrupoCliente::create([
                 'nombre' => $request->nombre,
                 'estado' => 1,
             ]);
-            $grupoId = $grupo->id_grupo;
-        } else {
-            // Validar que el grupo existe
-            $request->validate([
-                'grupo_id' => 'exists:grupo_clientes,id_grupo'
+            $grupoId = $nuevoGrupo->id_grupo;
+
+        } elseif ($request->grupo_id === 'create_custom') {
+            $nuevoGrupo = GrupoCliente::create([
+                'nombre' => $request->nuevo_grupo_nombre,
+                'estado' => 1,
             ]);
+            $grupoId = $nuevoGrupo->id_grupo;
+
+        } else {
+            // Validar que el grupo seleccionado existe
+            $request->validate(['grupo_id' => 'exists:grupo_clientes,id_grupo']);
+            $grupoId = $request->grupo_id;
         }
 
-        // Obtener información de provincia y distrito
+        // 3. Procesar Dirección
         $provincia = Provincia::findOrFail($request->provincia);
         $distrito = Distrito::findOrFail($request->distrito);
-
         $direccionCompleta = "{$provincia->nombre_provincia}, {$distrito->nombre_distrito}, {$request->direccion}";
 
+        // 4. Actualizar Cliente
         $cliente->update([
             'nombre'      => $request->nombre,
             'telefono'    => $request->telefono,
@@ -195,7 +214,6 @@ class ClienteController extends Controller
         return redirect()->route('clientes.index')
             ->with('success', 'Cliente actualizado correctamente');
     }
-
     /**
      * Toggle cliente estado (activar/desactivar)
      */
