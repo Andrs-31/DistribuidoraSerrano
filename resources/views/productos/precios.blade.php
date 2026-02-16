@@ -5,7 +5,7 @@
     <div class="card-header d-flex justify-content-between align-items-center">
         <div>
             <h5 class="mb-0">Precios por Cliente/Grupo</h5>
-            <small class="text-muted">{{ $producto->nombre }}</small>
+            <small class="text-muted">Producto: <strong>{{ $producto->nombre }}</strong></small>
         </div>
         <a href="{{ route('productos.index') }}" class="btn btn-secondary btn-sm">Volver</a>
     </div>
@@ -57,26 +57,24 @@
                             </td>
 
                             <td class="text-end">
-                            <div class="btn-group w-100">
+                                <form id="{{ $formId }}" action="{{ route('productos.precios.upsert', $producto->id_producto) }}" method="POST">
+                                    @csrf
+                                    <input type="hidden" name="id_grupo_fk" value="{{ $g->id_grupo }}">
+                                    
+                                    <div class="btn-group w-100">
+                                        <button type="submit" class="btn btn-sm btn-light btn-save text-success" title="Guardar Precio">
+                                            <i class="bi bi-plus-lg"></i>
+                                            <span class="ms-1">Agregar</span>
+                                        </button>
 
-                                <!-- BOTON GUARDAR DINAMICO -->
-                                <button type="submit"
-                                    class="btn btn-sm btn-light btn-save text-success"
-                                    form="{{ $formId }}"
-                                    title="Guardar Precio">
-                                    <i class="bi bi-plus-lg"></i>
-                                    <span class="ms-1">Agregar</span>
-                                </button>
-
-                                <!-- BOTON FIJO VER LISTA CLIENTE -->
-                                <a href="{{ route('clientes.index', ['grupo' => $g->id_grupo]) }}"
-                                class="btn btn-sm btn-light text-info"
-                                title="Ver clientes de este grupo">
-                                    <i class="bi bi-people-fill"></i>
-                                </a>
-
-                            </div>
-                        </td>
+                                        <a href="{{ route('clientes.index', ['grupo' => $g->id_grupo]) }}"
+                                           class="btn btn-sm btn-light text-info"
+                                           title="Ver clientes de este grupo">
+                                            <i class="bi bi-people-fill"></i>
+                                        </a>
+                                    </div>
+                                </form>
+                            </td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -86,98 +84,59 @@
 </div>
 
 <script>
-
 const preciosData = @json($precios);
 
-/* ===============================
-   NORMALIZADOR SEGURO
-================================ */
 function normalizar(valor){
-    return String(valor ?? '')
-        .toLowerCase()
-        .trim();
+    return String(valor ?? '').toLowerCase().trim();
 }
 
-/* ===============================
-   RESET VISUAL COMPLETO
-================================ */
 function resetFila(fila){
-
     fila.querySelector('.inp-precio').value = "0.00";
     fila.querySelector('.sel-estado').value = "1";
 
     const btn = fila.querySelector('.btn-save');
-
-    btn.classList.remove('text-primary');
-    btn.classList.add('text-success');
-
+    btn.classList.replace('text-primary', 'text-success');
     btn.querySelector('span').innerText = "Agregar";
     btn.querySelector('i').className = "bi bi-plus-lg";
 }
 
-/* ===============================
-   SET MODO ACTUALIZAR
-================================ */
 function setActualizar(fila, registro){
-
-    fila.querySelector('.inp-precio').value =
-        Number(registro.precio_base || 0).toFixed(2);
-
-    fila.querySelector('.sel-estado').value =
-        String(registro.estado ?? "1");
+    fila.querySelector('.inp-precio').value = Number(registro.precio_base || 0).toFixed(2);
+    fila.querySelector('.sel-estado').value = String(registro.estado ?? "1");
 
     const btn = fila.querySelector('.btn-save');
-
-    btn.classList.remove('text-success');
-    btn.classList.add('text-primary');
-
+    btn.classList.replace('text-success', 'text-primary');
     btn.querySelector('span').innerText = "Actualizar";
     btn.querySelector('i').className = "bi bi-arrow-repeat";
 }
 
-/* ===============================
-   ACTUALIZAR FILA
-================================ */
 function actualizarFila(grupoId){
-
     const fila = document.querySelector(`#row-${grupoId}`);
     if(!fila) return;
 
-    const unidadActual = normalizar(
-        fila.querySelector('.sel-unidad').value
-    );
-
-    // 🔥 SIEMPRE LIMPIAR PRIMERO
+    const unidadActual = normalizar(fila.querySelector('.sel-unidad').value);
+    
     resetFila(fila);
 
-    // Buscar registro
+    // Buscar si ya existe un precio para este grupo y unidad
     const registro = preciosData.find(p =>
         Number(p.id_grupo_fk) === Number(grupoId) &&
         normalizar(p.unidad) === unidadActual
     );
 
-    // Si existe → sobreescribe
-    if(registro){
+    if(registro) {
         setActualizar(fila, registro);
     }
 }
 
-/* ===============================
-   INIT EVENTOS
-================================ */
 document.addEventListener('DOMContentLoaded', () => {
-
     document.querySelectorAll('.sel-unidad').forEach(select => {
-
         select.addEventListener('change', () => {
             actualizarFila(select.dataset.grupo);
         });
-
-        // Estado inicial
+        // Inicializar estado de cada fila al cargar
         actualizarFila(select.dataset.grupo);
     });
-
 });
-
 </script>
 @endsection
