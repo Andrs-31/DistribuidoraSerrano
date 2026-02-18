@@ -31,7 +31,30 @@ class AuthController extends Controller
 
         if (Auth::attempt($credentials, $remember)) {
             $request->session()->regenerate();
-            return redirect()->intended(route('dashboard.index'))->with('success', 'Inicio de sesión exitoso.');
+            // Redirección por rol/permiso del usuario
+            $user = Auth::user();
+
+            $route = 'dashboard.index';
+
+            if ($user && $user->permiso) {
+                switch ($user->permiso->nombre) {
+                    case 'facturacion':
+                        $route = 'facturacion.index';
+                        break;
+                    case 'gestion_clientes':
+                        $route = 'clientes.index';
+                        break;
+                    case 'gestion_productos':
+                        $route = 'productos.index';
+                        break;
+                    case 'admin':
+                    default:
+                        $route = 'dashboard.index';
+                        break;
+                }
+            }
+
+            return redirect()->intended(route($route))->with('success', 'Inicio de sesión exitoso.');
         }
 
         return back()->withInput($request->only('email', 'remember'))->with('error', 'Credenciales incorrectas.');
