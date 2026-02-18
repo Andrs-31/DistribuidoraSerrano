@@ -5,8 +5,20 @@
     </div>
 
     @php
+        use Illuminate\Support\Facades\DB;
+
         $usuario = auth()->user();
-        $permiso = optional(optional($usuario)->permiso)->nombre ?? null;
+
+        $permiso = null;
+        if ($usuario && isset($usuario->permiso_fk)) {
+            $permiso = DB::table('permisos')
+                ->where('id_permiso', $usuario->permiso_fk)
+                ->value('nombre');
+        }
+
+        $can = function(array $allowed) use ($permiso) {
+            return $permiso === 'admin' || in_array($permiso, $allowed);
+        };
     @endphp
 
     <nav class="sidebar-nav">
@@ -20,53 +32,53 @@
 
         <div class="nav-section mt-3">Facturación</div>
 
-        @if($permiso === 'admin' || in_array($permiso, ['facturacion','gestion_facturacion']))
-        <a href="{{ route('facturacion.create') }}" class="nav-link {{ request()->routeIs('facturacion.create') ? 'active' : '' }}">
-            <i class="bi bi-plus-circle"></i>
-            <span>Nueva Factura</span>
-        </a>
+        @if($can(['facturacion']))
+            <a href="{{ route('facturacion.create') }}" class="nav-link {{ request()->routeIs('facturacion.create') ? 'active' : '' }}">
+                <i class="bi bi-plus-circle"></i>
+                <span>Nueva Factura</span>
+            </a>
 
-        <a href="{{ route('facturacion.index') }}" class="nav-link {{ request()->routeIs('facturacion.index') || request()->routeIs('facturacion.show') ? 'active' : '' }}">
-            <i class="bi bi-receipt"></i>
-            <span>Historial de Facturas</span>
-        </a>
+            <a href="{{ route('facturacion.index') }}" class="nav-link {{ request()->routeIs('facturacion.index') || request()->routeIs('facturacion.show') ? 'active' : '' }}">
+                <i class="bi bi-receipt"></i>
+                <span>Historial de Facturas</span>
+            </a>
         @endif
 
         <div class="nav-section mt-3">Gestión</div>
 
-        @if($permiso === 'admin' || in_array($permiso, ['clientes','gestion_clientes']))
-        <a href="{{ route('clientes.index') }}" class="nav-link {{ request()->routeIs('clientes.*') ? 'active' : '' }}">
-            <i class="bi bi-people"></i>
-            <span>Clientes</span>
-        </a>
+        @if($can(['gestion_clientes']))
+            <a href="{{ route('clientes.index') }}" class="nav-link {{ request()->routeIs('clientes.*') ? 'active' : '' }}">
+                <i class="bi bi-people"></i>
+                <span>Clientes</span>
+            </a>
         @endif
 
-        @if($permiso === 'admin' || in_array($permiso, ['productos','gestion_productos']))
-        <a href="{{ route('productos.index') }}" class="nav-link {{ request()->routeIs('productos.*') ? 'active' : '' }}">
-            <i class="bi bi-box-seam"></i>
-            <span>Productos</span>
-        </a>
+        @if($can(['gestion_productos']))
+            <a href="{{ route('productos.index') }}" class="nav-link {{ request()->routeIs('productos.*') ? 'active' : '' }}">
+                <i class="bi bi-box-seam"></i>
+                <span>Productos</span>
+            </a>
         @endif
 
-        @if($permiso === 'admin' || in_array($permiso, ['usuarios','gestion_usuarios']))
-        <a href="{{ route('usuarios.index') }}" class="nav-link {{ request()->routeIs('usuarios.*') ? 'active' : '' }}">
-            <i class="bi bi-person-circle"></i>
-            <span>Usuarios</span>
-        </a>
+        @if($can(['gestion_usuarios']))
+            <a href="{{ route('usuarios.index') }}" class="nav-link {{ request()->routeIs('usuarios.*') ? 'active' : '' }}">
+                <i class="bi bi-person-circle"></i>
+                <span>Usuarios</span>
+            </a>
         @endif
 
         <div class="nav-section mt-3">Reportes</div>
 
-        @if($permiso === 'admin' || in_array($permiso, ['reportes','gestion_reportes']))
-        <a href="{{ route('reportes.ventas') }}" class="nav-link {{ request()->routeIs('reportes.ventas') ? 'active' : '' }}">
-            <i class="bi bi-bar-chart"></i>
-            <span>Reporte de Ventas</span>
-        </a>
+        @if($can(['reportes']))
+            <a href="{{ route('reportes.ventas') }}" class="nav-link {{ request()->routeIs('reportes.ventas') ? 'active' : '' }}">
+                <i class="bi bi-bar-chart"></i>
+                <span>Reporte de Ventas</span>
+            </a>
 
-        <a href="{{ route('reportes.facturas') }}" class="nav-link {{ request()->routeIs('reportes.facturas') ? 'active' : '' }}">
-            <i class="bi bi-file-earmark-text"></i>
-            <span>Reporte de Facturas</span>
-        </a>
+            <a href="{{ route('reportes.facturas') }}" class="nav-link {{ request()->routeIs('reportes.facturas') ? 'active' : '' }}">
+                <i class="bi bi-file-earmark-text"></i>
+                <span>Reporte de Facturas</span>
+            </a>
         @endif
         @endauth
     </nav>
@@ -77,8 +89,12 @@
                 <i class="bi bi-person text-secondary"></i>
             </div>
             <div class="flex-grow-1">
-                <div class="fw-medium" style="font-size: 0.875rem;">{{ $usuario->nombre ?? $usuario->user ?? 'Usuario' }}</div>
-                <div class="text-secondary" style="font-size: 0.75rem;">{{ $permiso ?? '—' }}</div>
+                <div class="fw-medium" style="font-size: 0.875rem;">
+                    {{ $usuario->nombre ?? $usuario->name ?? 'Usuario' }}
+                </div>
+                <div class="text-secondary text-uppercase" style="font-size: 0.75rem;">
+                    {{ $permiso ?? '—' }}
+                </div>
             </div>
             @auth
             <form action="{{ route('logout') }}" method="POST" class="d-inline">

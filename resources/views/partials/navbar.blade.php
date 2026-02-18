@@ -1,6 +1,20 @@
 <header class="main-navbar">
+    @php
+        use Illuminate\Support\Facades\DB;
+
+        $usuario = auth()->user();
+
+        $permiso = null;
+        if ($usuario && isset($usuario->permiso_fk)) {
+            $permiso = DB::table('permisos')
+                ->where('id_permiso', $usuario->permiso_fk)
+                ->value('nombre');
+        }
+    @endphp
+
     <div class="d-flex align-items-center gap-2">
-        <button class="btn btn-link d-lg-none p-0 text-secondary" type="button" onclick="document.getElementById('sidebar').classList.toggle('show')">
+        <button class="btn btn-link d-lg-none p-0 text-secondary" type="button"
+            onclick="document.getElementById('sidebar').classList.toggle('show')">
             <i class="bi bi-list fs-4"></i>
         </button>
 
@@ -12,6 +26,7 @@
             @hasSection('page-title')
                 <h1 class="h5 mb-0 fw-semibold">@yield('page-title')</h1>
             @endif
+
             @hasSection('breadcrumb')
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb mb-0" style="font-size: 0.8125rem;">
@@ -25,14 +40,11 @@
     <div class="d-flex align-items-center gap-3">
         <div class="position-relative d-none d-md-block">
             <input type="text" class="form-control form-control-sm ps-4" placeholder="Buscar..." style="width: 200px;">
-            <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-2 text-secondary" style="font-size: 0.875rem;"></i>
+            <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-2 text-secondary"
+               style="font-size: 0.875rem;"></i>
         </div>
 
-        <a href="{{ route('facturacion.create') }}" class="btn btn-primary btn-sm d-none d-sm-inline-flex align-items-center gap-1">
-            <i class="bi bi-plus-lg"></i>
-            <span>Nueva Factura</span>
-        </a>
-
+        {{-- Notificaciones --}}
         <div class="dropdown">
             <button class="btn btn-link p-0 text-secondary position-relative" type="button" data-bs-toggle="dropdown">
                 <i class="bi bi-bell fs-5"></i>
@@ -55,9 +67,36 @@
             </ul>
         </div>
 
+        {{-- Fecha --}}
         <div class="d-none d-lg-block text-end border-start ps-3">
             <div class="fw-medium" style="font-size: 0.875rem;">{{ now()->format('d M, Y') }}</div>
             <div class="text-secondary" style="font-size: 0.75rem;">{{ now()->format('h:i A') }}</div>
         </div>
+
+        {{-- Usuario --}}
+        @auth
+        <div class="dropdown d-none d-lg-block">
+            <button class="btn btn-link p-0 text-secondary" type="button" data-bs-toggle="dropdown">
+                <i class="bi bi-person-circle fs-4"></i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
+                <li class="px-3 py-2">
+                    <div class="fw-semibold">{{ $usuario->nombre ?? $usuario->name ?? 'Usuario' }}</div>
+                    <div class="text-secondary text-uppercase" style="font-size:.8rem;">
+                        {{ $permiso ?? 'sin_permiso' }}
+                    </div>
+                </li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <form action="{{ route('logout') }}" method="POST" class="m-0">
+                        @csrf
+                        <button class="dropdown-item text-danger" type="submit">
+                            <i class="bi bi-box-arrow-right me-2"></i>Cerrar sesión
+                        </button>
+                    </form>
+                </li>
+            </ul>
+        </div>
+        @endauth
     </div>
 </header>
