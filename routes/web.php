@@ -32,6 +32,9 @@ Route::middleware('auth')->group(function () {
 
         // Distritos dinámicos (AJAX)
         Route::get('/distritos/{provincia}', [UbicacionController::class, 'distritos']);
+
+        Route::get('clientes/{cliente}/precios', [ListaPrecioController::class, 'indexPorCliente'])
+        ->name('clientes.precios');
     });
 
 
@@ -64,10 +67,6 @@ Route::middleware('auth')->group(function () {
         Route::post('productos/{producto}/precios/por-cliente', [ListaPrecioController::class, 'upsertPrecioPorCliente'])
             ->name('productos.precios.porCliente');
 
-        Route::get('clientes/{cliente}/precios', [ListaPrecioController::class, 'indexPorCliente'])
-        ->name('clientes.precios');
-
-        
 
     });
 
@@ -84,7 +83,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/usuarios/{usuario}/toggle-status', function ($usuario) { return redirect()->route('usuarios.show', $usuario)->with('success', 'Estado cambiado (simulado).'); })->name('usuarios.toggle-status');
     });
 
-    // Facturación (requieren permiso 'facturacion')
+   // Facturación (requieren permiso 'facturacion')
     Route::middleware('permiso:facturacion')->group(function () {
         Route::get('/facturacion', [FacturacionController::class, 'index'])->name('facturacion.index');
         Route::get('/facturacion/create', [FacturacionController::class, 'create'])->name('facturacion.create');
@@ -95,19 +94,23 @@ Route::middleware('auth')->group(function () {
         Route::delete('/facturacion/{factura}', [FacturacionController::class, 'destroy'])->name('facturacion.destroy');
         Route::get('/facturacion/{factura}/print', function ($factura) { return view('facturacion.print', compact('factura')); })->name('facturacion.print');
 
-        // Endpoint para generar PDF
+        // Endpoints para PDF
         Route::post('/facturacion/pdf/generar', [FacturacionController::class, 'generarPdf'])->name('facturacion.generar-pdf');
-
-        // Endpoint auxiliar: productos por cliente
-        Route::get('/facturacion/clientes/{clienteId}/productos', [ListaPrecioController::class, 'porCliente'])->name('facturacion.productos-por-cliente');
-        // Esta obtiene los datos (usada por el ojito)
-        Route::get('/facturacion/{factura}/datos-pdf', [FacturacionController::class, 'obtenerDatosPdf']);
-        // Esta genera el PDF (la que te daba error 405, debe ser POST)
         Route::post('/facturacion/generar-pdf', [FacturacionController::class, 'generarPdf']);
-        // Cambiamos a POST para evitar problemas de compatibilidad con algunos navegadores
-        Route::post('/facturacion/{factura}/anular', [App\Http\Controllers\FacturacionController::class, 'anular'])->name('facturacion.anular');
-    });
+        Route::get('/facturacion/{factura}/datos-pdf', [FacturacionController::class, 'obtenerDatosPdf']);
+        Route::get('/facturacion/{num_factura}/pdf', [FacturacionController::class, 'descargarPdf'])->name('facturacion.pdf.descargar');
 
+        // Auxiliares
+        Route::get('/facturacion/clientes/{clienteId}/productos', [ListaPrecioController::class, 'porCliente'])->name('facturacion.productos-por-cliente');
+        
+        // Anular Factura
+        Route::post('/facturacion/{factura}/anular', [FacturacionController::class, 'anular'])->name('facturacion.anular');
+
+        // --- EL CAMBIO ESTÁ AQUÍ ---
+        // Esta ruta debe coincidir con el fetch del botón "Enviar Correo" en tu JS
+        Route::post('/facturacion/{num_factura}/enviar', [FacturacionController::class, 'enviarEmail'])->name('facturacion.enviar-email');
+    });
+    
     // Reportes (requieren permiso 'reportes')
     Route::middleware('permiso:reportes')->group(function () {
         Route::get('/reportes/ventas', function () { return view('reportes.ventas'); })->name('reportes.ventas');

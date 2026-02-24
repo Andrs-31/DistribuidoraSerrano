@@ -515,154 +515,84 @@
             const token = tokenMeta ? tokenMeta.getAttribute('content') : '';
 
             fetch(form.action, {
-                method: form.method || 'POST',
-                headers: token ? { 'X-CSRF-TOKEN': token } : {},
-                body: formData,
-            }).then(resp => {
-                // consider success if 2xx
-                if (resp.ok) {
-                    return resp.json().then(data => {
-                        if (data.success) {
-                            showToast(`Factura #${data.factura_id || ''} emitida correctamente`, 'success');
-                            if (typeof followup === 'function') followup();
-                            // Optionally redirect or close modal
-                            if (previewModal) previewModal.hide();
-                            
-                            // Recargar la página después de 1.5 segundos para mostrar el toast
-                            setTimeout(() => {
-                                window.location.href = '{{ route("facturacion.create") }}';
-                            }, 1500);
-                        } else {
-                            showToast(data.message || 'Error al emitir la factura', 'danger');
-                            // Re-disable cliente_id if it was disabled
-                            if (wasDisabled && clienteSelect) clienteSelect.disabled = true;
-                            form.submit();
-                        }
-                    });
-                } else {
-                    // Handle error response
-                    return resp.json().then(data => {
-                        showToast(data.message || 'Error al emitir la factura', 'danger');
-                        // Re-disable cliente_id if it was disabled
-                        if (wasDisabled && clienteSelect) clienteSelect.disabled = true;
-                    }).catch(() => {
-                        // Re-disable cliente_id if it was disabled
-                        if (wasDisabled && clienteSelect) clienteSelect.disabled = true;
-                        form.submit();
-                    });
-                }
-            }).catch(err => {
-                console.error(err);
-                form.submit();
-            }).finally(() => {
-                modalFooterBtns.forEach(b => b.disabled = false);
-            });
+    method: form.method || 'POST',
+    headers: token ? { 'X-CSRF-TOKEN': token } : {},
+    body: formData,
+})
+.then(async (resp) => {
+
+    if (!resp.ok) {
+        // Intentar leer error como JSON
+        try {
+            const errorData = await resp.json();
+            showToast(errorData.message || 'Error al emitir la factura', 'danger');
+        } catch {
+            showToast('Error inesperado al emitir la factura', 'danger');
+        }
+
+        if (wasDisabled && clienteSelect) clienteSelect.disabled = true;
+        return;
+    }
+
+    // 🔥 SI ES DESCARGA → manejar como PDF (blob)
+    if (postAction === 'download') {
+        const blob = await resp.blob();
+        const url = window.URL.createObjectURL(blob);
+        window.open(url, '_blank');
+
+        if (previewModal) previewModal.hide();
+
+        setTimeout(() => {
+            window.location.href = '{{ route("facturacion.create") }}';
+        }, 1000);
+
+        return;
+    }
+
+    // 🔹 SI ES EMAIL O EMITIR NORMAL → JSON
+    const data = await resp.json();
+
+    if (data.success) {
+
+        if (data.email_sent) {
+            showToast(`Factura #${data.factura_id} enviada por correo correctamente`, 'success');
+        } 
+        else if (data.warning) {
+            showToast(data.warning, 'warning');
+        } 
+        else {
+            showToast(`Factura #${data.factura_id} emitida correctamente`, 'success');
+        }
+
+        if (previewModal) previewModal.hide();
+
+        setTimeout(() => {
+            window.location.href = '{{ route("facturacion.create") }}';
+        }, 1500);
+    } else {
+        showToast('No se pudo emitir la factura', 'danger');
+    }
+
+})
+.catch((err) => {
+    console.error(err);
+    showToast('Error de conexión con el servidor', 'danger');
+
+    if (wasDisabled && clienteSelect) clienteSelect.disabled = true;
+})
+.finally(() => {
+    modalFooterBtns.forEach(b => b.disabled = false);
+});
         }
 
         document.getElementById('btnDescargarImprimir')?.addEventListener('click', function() {
-            submitEmit('download', function() {
-                generarPdfDelServidor({save: true});
-            });
+            submitEmit('download');
         });
 
         document.getElementById('btnEnviarCorreo')?.addEventListener('click', function() {
-            submitEmit('email', function() {
-                generarPdfDelServidor({email: true});
-            });
+            submitEmit('email');
         });
 
-        // --- PDF generation (server-side) ---
-        async function generarPdfDelServidor(options = {}) {
-            try {
-                // Recolectar datos de la factura
-                const rows = document.querySelectorAll('.detalle-row');
-                let detalles = [];
-                let total = 0;
-
-                rows.forEach(r => {
-                    const desc = (r.querySelector('input[name*="[descripcion]"]')?.value || '').trim();
-                    const cantidad = parseFloat(r.querySelector('.cantidad-input')?.value || 0) || 0;
-                    const unidad = r.querySelector('.unidad-select')?.value || '';
-                    const precio = parseFloat(r.querySelector('.precio-input')?.value || 0) || 0;
-                    const subtotal = parseFloat(r.querySelector('.subtotal-input')?.value || 0) || 0;
-                    total += subtotal;
-
-                    if (desc) {
-                        detalles.push({
-                            descripcion: desc,
-                            cantidad: cantidad,
-                            unidad: unidad,
-                            precio_unitario: precio,
-                            subtotal: subtotal
-                        });
-                    }
-                });
-
-                // Datos del cliente
-                const clienteSel = document.getElementById('cliente_id');
-                const clienteNombre = clienteSel ? clienteSel.options[clienteSel.selectedIndex]?.textContent || '' : '';
-                const clienteRucEl = document.getElementById('clienteRuc');
-                const clienteRuc = clienteRucEl ? clienteRucEl.textContent : '';
-                const fecha = document.getElementById('fecha') ? document.getElementById('fecha').value : new Date().toISOString().split('T')[0];
-                const numero = document.getElementById('numero') ? document.getElementById('numero').value : 'TEMP';
-
-                // Enviar al servidor
-                const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-                const response = await fetch('{{ route("facturacion.generar-pdf") }}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': token
-                    },
-                    body: JSON.stringify({
-                        cliente_nombre: clienteNombre,
-                        cliente_ruc: clienteRuc,
-                        numero: numero,
-                        fecha: fecha,
-                        detalles: detalles,
-                        total: total
-                    })
-                });
-
-                if (!response.ok) {
-                    showToast('Error al generar PDF: ' + response.statusText, 'danger');
-                    return;
-                }
-
-                const blob = await response.blob();
-                const url = URL.createObjectURL(blob);
-                const filename = `factura_${numero}_${fecha}.pdf`;
-
-                if (options.save) {
-                    // Descargar el PDF
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                } else if (options.email) {
-                    // Descargar y abrir cliente de correo
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                    
-                    // Abrir cliente de correo
-                    const subject = encodeURIComponent('Factura - Emitida');
-                    const body = encodeURIComponent('Adjunto encontrará la factura emitida.');
-                    window.location.href = `mailto:?subject=${subject}&body=${body}`;
-                }
-
-                // Limpiar URL
-                setTimeout(() => URL.revokeObjectURL(url), 100);
-            } catch (err) {
-                console.error('Error generando PDF:', err);
-                showToast('Error al generar PDF.', 'danger');
-            }
-        }
     });
 })();
 </script>

@@ -10,6 +10,7 @@ use App\Models\Producto;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 
 class FacturacionController extends Controller
 {
@@ -57,83 +58,149 @@ class FacturacionController extends Controller
         return view('facturacion.create', compact('clientes', 'productos', 'proximoNumero'));
     }
 
-    public function store(Request $request)
-    {
-        // Validar datos básicos
-        $validated = $request->validate([
-            'cliente_id' => 'required|string|exists:clientes,ruc',
-            'numero' => 'required|string',
-            'fecha' => 'required|date',
-            'detalles' => 'required|array|min:1',
-            'detalles.*.producto_id' => 'required|exists:productos,id_producto',
-            'detalles.*.cantidad' => 'required|numeric|min:0.01',
-            'detalles.*.unidad' => 'required|string',
-            'detalles.*.precio_unitario' => 'required|numeric|min:0',
-            'detalles.*.subtotal' => 'required|numeric|min:0',
+   public function store(Request $request)
+{
+    $validated = $request->validate([
+        'cliente_id' => 'required|string|exists:clientes,ruc',
+        'numero' => 'required|string',
+        'fecha' => 'required|date',
+        'detalles' => 'required|array|min:1',
+        'detalles.*.producto_id' => 'required|exists:productos,id_producto',
+        'detalles.*.cantidad' => 'required|numeric|min:0.01',
+        'detalles.*.unidad' => 'required|string',
+        'detalles.*.precio_unitario' => 'required|numeric|min:0',
+        'detalles.*.subtotal' => 'required|numeric|min:0',
+    ]);
+
+    try {
+        DB::beginTransaction();
+
+        $total = collect($validated['detalles'])->sum('subtotal');
+        $numFacturaInt = (int) $validated['numero'];
+
+        $factura = Factura::create([
+            'num_factura' => $numFacturaInt,
+            'fecha_factura' => $validated['fecha'],
+            'ruc_cliente_fk' => $validated['cliente_id'],
+            'id_usuario_fk' => Auth::id() ?? 1,
+            'subtotal' => $total,
+            'impuesto' => 0,
+            'total' => $total,
+            'estado' => 'emitido',
         ]);
 
-        try {
-            $factura = DB::transaction(function () use ($validated, $request) {
-                // Obtener cliente
-                $cliente = Cliente::findOrFail($validated['cliente_id']);
-
-                // Calcular total
-                $total = collect($validated['detalles'])->sum('subtotal');
-
-                // Convertir número de factura a entero
-                $numFacturaInt = (int) $validated['numero'];
-
-                // Crear factura usando la transacción
-                $factura = Factura::create([
-                    'num_factura' => $numFacturaInt,
-                    'fecha_factura' => $validated['fecha'],
-                    'ruc_cliente_fk' => $validated['cliente_id'],
-                    'id_usuario_fk' => Auth::id() ?? 1,
-                    'subtotal' => $total,
-                    'impuesto' => 0,
-                    'total' => $total,
-                    'estado' => 'emitido',
-                ]);
-
-                // Guardar detalles
-                foreach ($validated['detalles'] as $detalle) {
-                    FacturaDetalle::create([
-                        'num_factura_fk' => $factura->num_factura,
-                        'id_producto_fk' => $detalle['producto_id'],
-                        'cantidad' => $detalle['cantidad'],
-                        'unidad' => $detalle['unidad'],
-                        'precio_unitario' => $detalle['precio_unitario'],
-                        'subtotal_linea' => $detalle['subtotal'],
-                    ]);
-                }
-
-                return $factura;
-            });
-
-            // Si es emit action, retornar JSON success
-            if ($request->input('action') === 'emit') {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Factura emitida correctamente',
-                    'factura_id' => str_pad($factura->num_factura, 6, '0', STR_PAD_LEFT),
-                ]);
-            }
-
-            return redirect()->route('facturacion.show', $factura->num_factura)
-                ->with('success', 'Factura guardada y emitida correctamente.');
-        } catch (\Exception $e) {
-            if ($request->input('action') === 'emit') {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Error al guardar factura: ' . $e->getMessage(),
-                ], 500);
-            }
-
-            return redirect()->back()
-                ->with('error', 'Error al guardar factura: ' . $e->getMessage())
-                ->withInput();
+        foreach ($validated['detalles'] as $detalle) {
+            FacturaDetalle::create([
+                'num_factura_fk' => $factura->num_factura,
+                'id_producto_fk' => $detalle['producto_id'],
+                'cantidad' => $detalle['cantidad'],
+                'unidad' => $detalle['unidad'],
+                'precio_unitario' => $detalle['precio_unitario'],
+                'subtotal_linea' => $detalle['subtotal'],
+            ]);
         }
+
+        DB::commit(); // <--- Guardamos definitivamente antes de intentar enviar el correo
+
+        /*
+        |--------------------------------------------------------------------------
+        | POST EMIT ACTION (CORREO)
+        |--------------------------------------------------------------------------
+        */
+        $emailSent = false;
+        $warning = null;
+
+        if ($request->post_emit_action === 'email') {
+            try {
+                $factura->load(['cliente', 'detalles.producto']);
+                
+                // --- DEFINIMOS LAS VARIABLES QUE FALTABAN ---
+                $numeroFactura = str_pad($factura->num_factura, 6, '0', STR_PAD_LEFT);
+                $fechaFactura = $factura->fecha_factura ? $factura->fecha_factura->format('d/m/Y') : date('d/m/Y');
+                
+                $data = [
+                    'nombre_cliente' => $factura->cliente->nombre,
+                    'numero' => $numeroFactura,
+                    'fecha' => $fechaFactura,
+                    'monto' => number_format($factura->total, 2)
+                ];
+
+                $empresa = [
+                    'nombre' => 'Distribuidora Serrano',
+                    'ruc' => '12345678-1-2020',
+                    'ciudad' => 'Ciudad de Panamá, Panamá',
+                ];
+
+                $html = view('facturacion.pdf', [
+                    'empresa' => $empresa,
+                    'cliente_nombre' => $factura->cliente->nombre,
+                    'cliente_ruc' => $factura->cliente->ruc,
+                    'numero' => $numeroFactura,
+                    'fecha' => $factura->fecha_factura->format('Y-m-d'),
+                    'detalles' => $factura->detalles->map(function($d) {
+                        return [
+                            'descripcion' => ($d->producto->codigo ?? '') . ' - ' . ($d->producto->nombre ?? ''),
+                            'cantidad' => $d->cantidad,
+                            'unidad' => $d->unidad,
+                            'precio_unitario' => (float)$d->precio_unitario,
+                            'subtotal' => (float)$d->subtotal_linea,
+                        ];
+                    }),
+                    'total' => $factura->total,
+                ])->render();
+
+                $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($html)->setPaper('a4');
+
+                \Illuminate\Support\Facades\Mail::send([], [], function ($message) use ($factura, $pdf, $data, $numeroFactura) {
+                    $message->to($factura->cliente->email)
+                        ->subject('Factura N° ' . $numeroFactura . ' - Distribuidora Serrano')
+                        ->html("
+                            <div style='font-family: Arial, sans-serif; color: #333; padding: 25px;'>
+                                <h2>¡Hola, {$data['nombre_cliente']}!</h2>
+                                <p>Adjuntamos su factura <b>#{$data['numero']}</b> del día {$data['fecha']}</b>.</p>
+                                <p>Puede responder a este correo si tiene dudas.</p>
+                                <p>Saludos,<br><b>Distribuidora Serrano</b></p>
+                            </div>
+                        ")
+                        ->attachData($pdf->output(), 'Factura_'.$numeroFactura.'.pdf', ['mime' => 'application/pdf']);
+                });
+
+                $emailSent = true;
+
+            } catch (\Throwable $mailException) {
+                // Si el correo falla, NO hacemos rollback, solo avisamos.
+                $warning = "La factura se creó, pero el correo no pudo enviarse: " . $mailException->getMessage();
+            }
+        }
+
+        if ($request->input('action') === 'emit') {
+            if ($request->post_emit_action === 'download') {
+                return $this->descargarPdf($factura->num_factura);
+            }
+
+            return response()->json([
+                'success' => true,
+                'factura_id' => str_pad($factura->num_factura, 6, '0', STR_PAD_LEFT),
+                'email_sent' => $emailSent,
+                'warning' => $warning
+            ]);
+        }
+
+        return redirect()->route('facturacion.show', $factura->num_factura)->with('success', 'Factura emitida correctamente.');
+
+    } catch (\Throwable $e) {
+        DB::rollBack();
+        if ($request->input('action') === 'emit') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al emitir factura: ' . $e->getMessage(),
+            ], 500);
+        }
+        return back()->with('error', 'Error al emitir factura: ' . $e->getMessage());
     }
+}
+
+
 
     public function show($factura)
     {
@@ -248,46 +315,114 @@ class FacturacionController extends Controller
         }
     }
 
-    public function enviarEmail($num_factura)
-    {
-       
-        try {
-            // Buscamos la factura en la base de datos
-            $factura = Factura::with(['cliente', 'detalles.producto'])->findOrFail($num_factura);
-            $cliente = $factura->cliente;
-            if (!$cliente || !$cliente->email) {
-                return response()->json(['success' => false, 'message' => 'El cliente no tiene un email válido.'], 400);
-            }
-                 // Recibe datos de la factura en JSON y genera PDF
-                $data = $request->json()->all();
 
-                // Extraer datos
-                $cliente_nombre = $data['cliente_nombre'] ?? 'Cliente';
-                $cliente_ruc = $data['cliente_ruc'] ?? '';
-                $numero = $data['numero'] ?? '';
-                $fecha = $data['fecha'] ?? date('Y-m-d');
-                $detalles = $data['detalles'] ?? [];
-                $total = $data['total'] ?? 0;
+public function descargarPdf($num_factura)
+{
+    // 1️⃣ Buscar factura con relaciones
+    $factura = Factura::with(['cliente', 'detalles.producto'])
+        ->findOrFail($num_factura);
 
-                // Datos de la empresa (hardcoded, idealmente de config)
-                $empresa = [
-                    'nombre' => 'Distribuidora Serrano',
-                    'ruc' => '12345678-1-2020',
-                    'ciudad' => 'Ciudad de Panamá, Panamá',
-                ];
+    // 2️⃣ Preparar datos EXACTAMENTE como los espera tu vista
+    $data = [
+        'empresa' => [
+            'nombre' => 'Distribuidora Serrano',
+            'ruc' => '12345678-1-2020',
+            'ciudad' => 'Ciudad de Panamá, Panamá',
+        ],
+        'cliente_nombre' => $factura->cliente->nombre ?? '',
+        'cliente_ruc'    => $factura->cliente->ruc ?? '',
+        'numero'         => str_pad($factura->num_factura, 6, '0', STR_PAD_LEFT),
+        'fecha'          => $factura->fecha_factura->format('Y-m-d'),
+        'detalles'       => $factura->detalles->map(function ($d) {
+            return [
+                'descripcion'     => ($d->producto->codigo ?? '') . ' - ' . ($d->producto->nombre ?? ''),
+                'cantidad'        => $d->cantidad,
+                'unidad'          => $d->unidad,
+                'precio_unitario' => (float) $d->precio_unitario,
+                'subtotal'        => (float) $d->subtotal_linea,
+            ];
+        })->toArray(),
+        'total' => (float) $factura->total,
+    ];
 
-                // Generar HTML para PDF
-                $html = view('facturacion.pdf', compact('empresa', 'cliente_nombre', 'cliente_ruc', 'numero', 'fecha', 'detalles', 'total'))->render();
+    // 3️⃣ Generar PDF usando la MISMA vista
+    $pdf = Pdf::loadView('facturacion.pdf', $data)
+        ->setPaper('a4');
 
-        // Generar PDF
+    // 4️⃣ Descargar archivo
+    return $pdf->download(
+        'factura_' . str_pad($factura->num_factura, 6, '0', STR_PAD_LEFT) . '.pdf'
+    );
+}
+
+public function enviarEmail(Request $request, $num_factura)
+{
+    try {
+        // 1. Buscamos la factura con todas sus relaciones necesarias
+        $factura = Factura::with(['cliente', 'detalles.producto'])->findOrFail($num_factura);
+        $cliente = $factura->cliente;
+
+        if (!$cliente || !$cliente->email) {
+            return response()->json([
+                'success' => false, 
+                'message' => 'El cliente no tiene un email válido registrado.'
+            ], 400);
+        }
+
+        // 2. Preparar los datos para la vista del PDF
+        $empresa = [
+            'nombre' => 'Distribuidora Serrano',
+            'ruc' => '12345678-1-2020',
+            'ciudad' => 'Ciudad de Panamá, Panamá',
+        ];
+        
+        $cliente_nombre = $cliente->nombre;
+        $cliente_ruc = $cliente->ruc;
+        $numero = str_pad($factura->num_factura, 6, '0', STR_PAD_LEFT);
+        $fecha = $factura->fecha_factura ? $factura->fecha_factura->format('Y-m-d') : date('Y-m-d');
+        $total = $factura->total;
+        
+        // Mapeamos los detalles para que coincidan con la estructura que espera tu vista pdf
+        $detalles = $factura->detalles->map(function($d) {
+            return [
+                'descripcion' => ($d->producto->codigo ?? '') . ' - ' . ($d->producto->nombre ?? 'Producto'),
+                'cantidad' => $d->cantidad,
+                'unidad' => $d->unidad,
+                'precio_unitario' => $d->precio_unitario,
+                'subtotal' => $d->subtotal_linea
+            ];
+        });
+
+        // 3. Generar el PDF en memoria
+        $html = view('facturacion.pdf', compact('empresa', 'cliente_nombre', 'cliente_ruc', 'numero', 'fecha', 'detalles', 'total'))->render();
         $pdf = Pdf::loadHTML($html)->setPaper('a4');
 
-        return $pdf->download("factura_{$numero}_{$fecha}.pdf");
-            
-            return response()->json(['success' => true, 'message' => 'Factura enviada por email correctamente.']);
-        } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => 'Error al enviar email: ' . $e->getMessage()], 500);
-        }
-        
+        // 4. Enviar el Correo usando el Facade Mail
+        \Illuminate\Support\Facades\Mail::send([], [], function ($message) use ($cliente, $pdf, $numero) {
+            $message->to($cliente->email)
+                ->subject("Copia de Factura #{$numero} - Distribuidora Serrano")
+                ->html("
+                    <p>Estimado cliente <b>{$cliente->nombre}</b>,</p>
+                    <p>Adjunto a este correo encontrará la copia de su factura electrónica número <b>{$numero}</b>.</p>
+                    <p>Si tiene alguna duda, por favor contáctenos.</p>
+                    <br>
+                    <p>Atentamente,<br><b>Distribuidora Serrano</b></p>
+                ")
+                ->attachData($pdf->output(), "factura_{$numero}.pdf", [
+                    'mime' => 'application/pdf',
+                ]);
+        });
+
+        return response()->json([
+            'success' => true, 
+            'message' => 'Factura enviada correctamente al correo: ' . $cliente->email
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false, 
+            'message' => 'Error al procesar el envío: ' . $e->getMessage()
+        ], 500);
     }
+}
 }

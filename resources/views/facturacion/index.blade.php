@@ -169,20 +169,36 @@
 
 function enviarCorreo(facturaId) {
     if (confirm('¿Desea enviar esta factura por correo electrónico al cliente?')) {
-        // AJAX call to send email
+        // Bloqueamos el botón o avisamos que se está enviando
+        const btn = event.currentTarget;
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+
         fetch(`/facturacion/${facturaId}/enviar`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json'
             }
         })
         .then(response => response.json())
         .then(data => {
-            alert(data.message || 'Factura enviada correctamente');
+            if(data.success) {
+                alert(data.message);
+            } else {
+                alert('Error: ' + data.message);
+            }
         })
         .catch(error => {
-            alert('Error al enviar la factura');
+            console.error('Error:', error);
+            alert('No se pudo conectar con el servidor para enviar el correo.');
+        })
+        .finally(() => {
+            // Restauramos el botón
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
         });
     }
 }
