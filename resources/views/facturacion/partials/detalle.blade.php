@@ -291,7 +291,7 @@
 
     document.getElementById('btnAgregarProducto').addEventListener('click', function() {
         if (!window.productosDelCliente) {
-            alert("Seleccione un cliente primero.");
+            showToast('Debe seleccionar un cliente antes de agregar productos', 'danger');
             return;
         }
 

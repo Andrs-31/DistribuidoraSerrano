@@ -130,11 +130,73 @@
             {{ $facturas->withQueryString()->links() }}
         </div>
     @endif
+
 </div>
+
+<div class="modal fade" id="confirmActionModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmTitle">Confirmar acción</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p id="confirmMessage" class="mb-0"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" id="confirmBtnAction" class="btn">Confirmar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="detalleToastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 9999;"></div>
 @endsection
 
 @push('scripts')
 <script>
+    let confirmModal;
+
+    // --- FUNCIÓN PARA MOSTRAR NOTIFICACIONES (AÑADIR ESTO) ---
+    function showToast(message, type = 'success') {
+        const container = document.getElementById('detalleToastContainer');
+        if (!container) return;
+
+        const toastId = 'toast-' + Date.now();
+        const bgClass = type === 'success' ? 'bg-success' : (type === 'warning' ? 'bg-warning' : 'bg-danger');
+        const icon = type === 'success' ? 'bi-check-circle' : 'bi-exclamation-circle';
+
+        const toastHtml = `
+            <div id="${toastId}" class="toast show shadow-lg" role="alert" aria-live="assertive" aria-atomic="true">
+                <div class="toast-header ${bgClass} text-white">
+                    <i class="bi ${icon} me-2"></i>
+                    <strong class="me-auto">Sistema de Facturación</strong>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+                <div class="toast-body fw-bold">
+                    ${message}
+                </div>
+            </div>`;
+        
+        container.insertAdjacentHTML('beforeend', toastHtml);
+
+        // Auto-eliminar después de 4 segundos
+        setTimeout(() => {
+            const toastElement = document.getElementById(toastId);
+            if (toastElement) {
+                toastElement.classList.remove('show');
+                setTimeout(() => toastElement.remove(), 300);
+            }
+        }, 4000);
+    }
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        confirmModal = new bootstrap.Modal(document.getElementById('confirmActionModal'));
+    });
+
+    const getBtnConfirmar = () => document.getElementById('confirmBtnAction');
+    
     async function vistaPreviaHistorial(numFactura) {
         try {
             // 1. Obtener datos
@@ -166,77 +228,84 @@
         }
     }
 
-
 function enviarCorreo(facturaId) {
-    if (confirm('¿Desea enviar esta factura por correo electrónico al cliente?')) {
-        // Bloqueamos el botón o avisamos que se está enviando
-        const btn = event.currentTarget;
-        const originalHtml = btn.innerHTML;
+    const btn = getBtnConfirmar();
+    document.getElementById('confirmTitle').innerText = 'Enviar Factura';
+    document.getElementById('confirmMessage').innerText = `¿Desea enviar la factura N° ${facturaId} por correo electrónico al cliente?`;
+    
+    btn.className = 'btn btn-primary';
+    btn.innerText = 'Enviar Correo';
+
+    btn.onclick = async () => {
         btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Enviando...';
 
-        fetch(`/facturacion/${facturaId}/enviar`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                'Accept': 'application/json'
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if(data.success) {
-                alert(data.message);
-            } else {
-                alert('Error: ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('No se pudo conectar con el servidor para enviar el correo.');
-        })
-        .finally(() => {
-            // Restauramos el botón
-            btn.disabled = false;
-            btn.innerHTML = originalHtml;
-        });
-    }
-}
+        try {
+            const response = await fetch(`/facturacion/${facturaId}/enviar`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                }
+            });
 
-async function anularFactura(numFactura) {
-    if (!confirm(`¿Desea anular la factura N° ${numFactura}?`)) return;
-
-    try {
-        const response = await fetch(`/facturacion/${numFactura}/anular`, {
-            method: 'POST', // Cambiado a POST para coincidir con web.php
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                'Accept': 'application/json' // Esto le dice a Laravel que queremos JSON, no HTML
-            }
-        });
-
-        // Verificamos si la respuesta es realmente JSON antes de parsear
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.indexOf("application/json") !== -1) {
             const data = await response.json();
             
-            if (response.ok && data.success) {
-                alert(data.message);
-                location.reload();
+            // 1. Cerramos el modal de confirmación primero
+            confirmModal.hide();
+
+            // 2. REEMPLAZO TOTAL DEL ALERT: Usamos tu función showToast
+            if (data.success) {
+                // Si el controlador respondió success: true
+                showToast(data.message, 'success');
             } else {
-                alert("Error: " + (data.error || data.message));
+                // Si hubo un error controlado (ej. cliente sin email)
+                showToast(data.message || 'Error al enviar la factura', 'danger');
             }
-        } else {
-            // Si el servidor mandó un error en HTML, lo capturamos aquí
-            const textError = await response.text();
-            console.error("Error del servidor (HTML):", textError);
-            alert("El servidor devolvió un error interno. Revisa la consola (F12).");
+
+        } catch (error) {
+            confirmModal.hide();
+            // Error de red o servidor (500)
+            showToast("No se pudo conectar con el servidor para enviar el correo", "danger");
+        } finally {
+            btn.disabled = false;
+            btn.innerText = 'Enviar Correo';
         }
-    } catch (error) {
-        console.error("Error en la petición:", error);
-        alert("No se pudo conectar con el servidor.");
-    }
+    };
+    confirmModal.show();
 }
+
+    function anularFactura(numFactura) {
+        const btn = getBtnConfirmar();
+        document.getElementById('confirmTitle').innerText = 'Anular Factura';
+        document.getElementById('confirmMessage').innerHTML = `¿Está seguro de que desea anular la factura <strong>${numFactura}</strong>? <br><small class="text-danger">Esta acción no se puede deshacer.</small>`;
+        
+        btn.className = 'btn btn-danger';
+        btn.innerText = 'Anular Permanentemente';
+
+        btn.onclick = async () => {
+            btn.disabled = true;
+            try {
+                const response = await fetch(`/facturacion/${numFactura}/anular`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    }
+                });
+                const data = await response.json();
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert(data.message);
+                    btn.disabled = false;
+                }
+            } catch (error) {
+                console.error(error);
+                btn.disabled = false;
+            }
+        };
+        confirmModal.show();
+    }
 </script>
 @endpush
